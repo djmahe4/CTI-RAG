@@ -33,8 +33,10 @@ class QueryPreprocessor:
         date_keys = self._extract_date_keys(query)  # 改为复数形式，支持多个日期
         if date_keys:
             filters['date_keys'] = date_keys  # 使用 date_keys 键存储列表
+            logger.info(f"提取的元数据过滤条件: {filters}")
+        else:
+            logger.debug(f"查询中未发现日期信息，不启用 date_key 过滤")
         
-        logger.info(f"提取的元数据过滤条件: {filters}")
         return filters
 
     def _extract_date_keys(self, query: str) -> list:
@@ -77,11 +79,13 @@ class QueryPreprocessor:
         return date_keys
 
     def build_milvus_filter(self, filters: Dict[str, Any]) -> Optional[str]:
-        """构建 Milvus 的 date_key 过滤表达式（支持多日期 OR 逻辑）"""
-        if not filters or 'date_keys' not in filters:
-            return None
+        """构建 Milvus 的 date_key 过滤表达式（支持多日期 OR 逻辑）
         
-        date_keys = filters['date_keys']
+        Returns:
+            过滤表达式字符串，如果没有日期则返回 None（不启用过滤）
+        """
+        # 如果没有提取到日期，不应用任何 date_key 过滤
+        date_keys = filters.get('date_keys', [])
         if not date_keys:
             return None
         

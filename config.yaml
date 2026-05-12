@@ -1,7 +1,7 @@
 # ThreatRAG 统一配置文件
 
 # 功能开关
-enable_reranker: false
+enable_reranker: true
 enable_knowledge_base: true
 enable_knowledge_graph: true
 enable_web_search: true
@@ -11,19 +11,17 @@ enable_hybrid_retrieval: true
 use_rewrite_query: "on"  # 是否使用重写查询
 
 # 模型配置
-model_provider: "deepseek"
-model_name: "deepseek-chat"
+model_provider: "ollama"
+model_name: "qwen3:30b"
 
-# 嵌入模型
-embed_model: "local/BAAI/bge-m3"
+embed_model: "dashscope/text-embedding-v4"
 
-# Reranker 模型 - 使用相同的bge-m3模型
-reranker: "local/BAAI/bge-m3"
-model_local_paths:
-  local/BAAI/bge-m3: "/app/models/embedding_model/bge-m3"
+reranker: "zhipu/rerank"
+
 
 # 设备配置
-device: "cuda"
+# 如宿主机或容器内未能正确挂载 GPU，可先改为 cpu，避免 CUDA 设备不可用错误
+device: "cpu"
 
 # FastAPI服务器配置
 fastapi_server:
@@ -62,3 +60,7 @@ neo4j:
   index_batch_size: 200  # 每次处理的实体数量
   auto_index: true  # 是否自动启动索引器
 
+rl_base_model_path: /app/models/reasoning_model/Qwen2.5-3B-Instruct
+rl_lora_path: /app/models/reasoning_model/final_lora
+rl_policy_checkpoint_path: /app/models/reasoning_model/rl_policy_path_match/best_policy.pt
+rl_device: cpu        # RL 接口暂时关闭，保持 CPU 安全态

@@ -16,6 +16,9 @@ from .bm25_retriever import HybridRetriever
 
 
 class KnowledgeBase:
+    EMBED_MODEL_ALIASES = {
+        "local/BAAI/bge-m3": "dashscope/text-embedding-v4",
+    }
 
     def __init__(self) -> None:
         self.client = None
@@ -42,6 +45,16 @@ class KnowledgeBase:
         self._check_migration()
 
         self._load_models()
+
+    @classmethod
+    def _normalize_embed_model_name(cls, model_name):
+        if not model_name:
+            return model_name
+        return cls.EMBED_MODEL_ALIASES.get(model_name, model_name)
+
+    @classmethod
+    def _is_embed_model_compatible(cls, lhs_model, rhs_model):
+        return cls._normalize_embed_model_name(lhs_model) == cls._normalize_embed_model_name(rhs_model)
 
     def _check_migration(self):
         """检查是否需要从JSON文件迁移到SQLite"""
@@ -282,7 +295,7 @@ class KnowledgeBase:
             return {"message": f"数据库不存在，db_id: {db_id}", "status": "failed"}
 
         # 检查嵌入模型是否匹配
-        if db["embed_model"] != self.embed_model.embed_model_fullname:
+        if not self._is_embed_model_compatible(db["embed_model"], self.embed_model.embed_model_fullname):
             logger.error(
                 f"Embed model not match, {db['embed_model']} != {self.embed_model.embed_model_fullname}")
             return {"message": f"Embed model not match, cur: {self.embed_model.embed_model_fullname}, req: {db['embed_model']}", "status": "failed"}
@@ -683,15 +696,15 @@ class KnowledgeBase:
 
             # 从节点元数据中提取静态字段
             # 提取归一化日期键 (date_key)
-            date_key = None
+            date_key = ""  # 默认为空字符串，避免 Milvus 插入 None 值
             filename_for_parse = node_meta.get("source_filename") or node_meta.get("filename")
             if filename_for_parse:
                 date_match = re.search(r'(\d{8})', filename_for_parse)
                 if date_match:
                     date_key = date_match.group(1)
             
-            static_source_filename = node_meta.get("source_filename") or node_meta.get("filename")
-            static_file_type = node_meta.get("file_type")
+            static_source_filename = node_meta.get("source_filename") or node_meta.get("filename") or ""
+            static_file_type = node_meta.get("file_type") or ""
             static_file_created_at = node_meta.get("file_created_at")
             if isinstance(static_file_created_at, float):
                 static_file_created_at = int(static_file_created_at)
@@ -785,7 +798,7 @@ class KnowledgeBase:
         if db is None:
             logger.warning(f"数据库不存在，无法检查嵌入模型匹配，db_id: {db_id}")
             return False
-        return db["embed_model"] == self.embed_model.embed_model_fullname
+        return self._is_embed_model_compatible(db["embed_model"], self.embed_model.embed_model_fullname)
 
     def get_user_knowledge_bases(self, user_id):
         logger.info(f"获取用户 {user_id} 的知识库")

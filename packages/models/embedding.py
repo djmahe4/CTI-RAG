@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import asyncio
-from FlagEmbedding import FlagModel
+from openai import OpenAI
 from zhipuai import ZhipuAI
 
 from .. import config
@@ -61,7 +61,7 @@ class BaseEmbeddingModel:
 
         return data
 
-class LocalEmbeddingModel(FlagModel, BaseEmbeddingModel):
+class LocalEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config, **kwargs):
         """
         对于本地模型，也可以在 src/static/models.private.yaml 中配置对应的 local_path 路径
@@ -102,13 +102,20 @@ class LocalEmbeddingModel(FlagModel, BaseEmbeddingModel):
                     f"然后配置 src/.env 文件中的 MODEL_DIR 环境变量到 /path/to/models 目录；"
                     f"如果是在 docker 中运行，请确保 docker-compose 文件（line 12 左右）中映射了 MODEL_DIR 到 /models 目录")
 
-        super().__init__(self.model,
-                query_instruction_for_retrieval=info.get("query_instruction", None),
-                use_fp16=False,
-                device=config.device,
-                **kwargs)
+        from FlagEmbedding import FlagModel
+
+        self._model = FlagModel(
+            self.model,
+            query_instruction_for_retrieval=info.get("query_instruction", None),
+            use_fp16=False,
+            device=config.device,
+            **kwargs,
+        )
 
         logger.info(f"Embedding model {info['name']} loaded")
+
+    def predict(self, message):
+        return self._model.encode(message)
 
 
 class ZhipuEmbedding(BaseEmbeddingModel):
@@ -160,7 +167,13 @@ class OtherEmbedding(BaseEmbeddingModel):
         self.dimension = self.info.get("dimension", None)
         self.model = self.info["name"]
         self.api_key = os.getenv(self.info["api_key"], None)
-        self.url = get_docker_safe_url(self.info["url"])
+        raw_url = self.info["url"]
+        if isinstance(raw_url, str) and not raw_url.startswith(("http://", "https://")):
+            raw_url = os.getenv(raw_url, raw_url)
+        self.url = get_docker_safe_url(raw_url)
+        self.client = None
+        if self.embed_model_fullname.startswith("dashscope/"):
+            self.client = OpenAI(api_key=self.api_key, base_url=self.url)
         assert self.url and self.model, f"URL and model are required. Cur embed model: {config.embed_model}"
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -168,6 +181,13 @@ class OtherEmbedding(BaseEmbeddingModel):
         }
 
     def predict(self, message):
+        if self.client is not None:
+            response = self.client.embeddings.create(
+                model=self.model,
+                input=message,
+            )
+            return [item.embedding for item in response.data]
+
         payload = self.build_payload(message)
         response = requests.request("POST", self.url, json=payload, headers=self.headers)
         response = json.loads(response.text)

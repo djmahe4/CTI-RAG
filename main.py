@@ -70,7 +70,7 @@ def start_server(host = "0.0.0.0", port = 8000):
     """start the fastapi server"""
     # 延迟导入，确保在Milvus启动后再导入
     from rag.api.server import fastapi_server
-    uvicorn.run(fastapi_server, host=host, port=port)
+    uvicorn.run(fastapi_server, host=host, port=port, proxy_headers=True, forwarded_allow_ips='*')
 
 
 def signal_handler(sig, frame):

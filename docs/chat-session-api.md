@@ -135,6 +135,17 @@ curl -X POST http://localhost:8006/chat/sessions/create \
 {"response": "完整回复", "status": "finished", "thread_id": "uuid-xxx"}
 ```
 
+一期模型路由上线后，响应中的 `meta` / 结果对象还会附带以下字段：
+
+- `expected_model_provider`
+- `expected_model_name`
+- `actual_model_provider`
+- `actual_model_name`
+- `degraded`
+- `route_reason`
+
+其中 `actual_*` 表示最终实际命中的模型，`degraded=true` 表示本次请求发生了回退或降级。
+
 ---
 
 #### 📌 使用方式 1: 继续已有会话（推荐）
@@ -418,6 +429,36 @@ curl -X DELETE "http://localhost:8006/chat/sessions/uuid-xxx/messages/123?user_i
 **写入顺序（双写）:**
 1. 先写入 MySQL（持久化）
 2. 再写入 Redis（缓存）
+
+---
+
+## 🚦 一期部署与后台任务说明
+
+### RabbitMQ 通道
+
+- RabbitMQ 用于后台任务分发，以及模型健康检查任务通道。
+- 前台 `/chat/stream` 仍然直接返回流式响应，RabbitMQ 不承接 token 流回传。
+
+### 关键环境变量
+
+```dotenv
+MODEL_ROUTER_ENABLED=true
+MODEL_ROUTER_DEFAULT_PROVIDER=deepseek
+MODEL_ROUTER_DEFAULT_MODEL=deepseek-chat
+MODEL_ROUTER_FALLBACK_CHAIN=deepseek:deepseek-chat,ollama:qwen3:30b,ollama:qwen2.5:7b
+MODEL_CIRCUIT_BREAKER_ENABLED=true
+MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS=60
+MODEL_CIRCUIT_BREAKER_OPEN_SECONDS=120
+MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES=2
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+```
+
+### Worker 启动与发布建议
+
+- `docker-compose.yml` 中的 `threatrag-worker` 服务基于 `Dockerfile.worker`。
+- 默认 `WORKER_TYPE=task`，用于消费健康检查、重试和死信恢复相关任务。
+- 发布时建议先启动 `rabbitmq`，再启动 `threatrag-worker`，最后滚动 API，避免任务写入后无人消费。
 
 **查询顺序（读穿）:**
 1. 先从 Redis 读取
@@ -705,4 +746,3 @@ python scripts/create_chat_tables.py create
 - [模型使用指南](model-usage-examples.md)
 - [API 测试示例](api-test-examples.md)
 - [Ollama 设置指南](ollama-setup.md)
-

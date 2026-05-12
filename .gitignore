@@ -199,9 +199,27 @@ data/etcd/
 data/minio/
 data/milvus/
 data/ollama/
+data/
+neo4j_data_bak/*
 
 # 保留用户上传的知识库文件，但需要手动管理
 # data/kb_*/
 
 #sql
 *.sql
+
+# ignore all files in the models folder
+models/reasoning_model/rl_policy_ecc/
+models/reasoning_model/rl_policy_path_match/
+models/reasoning_model/rl_policy_event_centric/
+
+CLAUDE.md
+#superpowers doc
+docs/superpowers/spec/*
+neo4j_data_bak
+
+
+blog.md
+chapter1-cti-kg-intro.md
+#
+docs/

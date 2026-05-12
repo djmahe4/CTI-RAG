@@ -4,7 +4,6 @@ import warnings
 import traceback
 import re
 
-import torch
 from neo4j import GraphDatabase as GD
 
 from .. import config

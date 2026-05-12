@@ -253,6 +253,43 @@ send_message_auto(query, user_id, title=title)
 
 ---
 
+## 🚦 一期路由与部署补充
+
+### 路由响应元数据
+
+一期聊天接口会在响应体中携带路由结果，便于客户端判断是否发生模型降级或回退：
+
+- `expected_model_provider`
+- `expected_model_name`
+- `actual_model_provider`
+- `actual_model_name`
+- `degraded`
+- `route_reason`
+
+### 运行时环境变量
+
+部署时建议显式配置以下环境变量：
+
+```dotenv
+MODEL_ROUTER_ENABLED=true
+MODEL_ROUTER_DEFAULT_PROVIDER=deepseek
+MODEL_ROUTER_DEFAULT_MODEL=deepseek-chat
+MODEL_ROUTER_FALLBACK_CHAIN=deepseek:deepseek-chat,ollama:qwen3:30b,ollama:qwen2.5:7b
+MODEL_CIRCUIT_BREAKER_ENABLED=true
+MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
+MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS=60
+MODEL_CIRCUIT_BREAKER_OPEN_SECONDS=120
+MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES=2
+RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+```
+
+### 后台任务通道
+
+- RabbitMQ 承担后台任务和模型健康检查消息通道，不接管前台流式 token 回传。
+- 部署 `docker-compose.yml` 时需要同时启动 `rabbitmq` 和 `threatrag-worker`，否则健康检查任务会堆积在队列中。
+
+---
+
 ## 🎉 总结
 
 ThreatRAG 聊天系统提供了 **灵活且强大** 的 API：
@@ -263,4 +300,3 @@ ThreatRAG 聊天系统提供了 **灵活且强大** 的 API：
 - ✅ **文档完善**: 详细的使用示例和最佳实践
 
 选择适合您场景的方式，开始使用吧！🚀
-

@@ -26,15 +26,9 @@ STIX_ENTITY_TYPES = {
     # 可观察对象 (Cyber Observables - SCOs)
     "ARTIFACT": "artifact",                  # 文件、payload 等二进制对象
     "FILE": "file",                          # 文件
-    "DIRECTORY": "directory",                # 目录
     "FILE_HASH": "file-hash",                # 文件哈希 (新增，用于统一管理 MD5, SHA等)
     "IP_ADDRESS": "ipv4-addr",               # IP 地址 (STIX标准为 ipv4-addr/ipv6-addr)
     "DOMAIN": "domain-name",                 # 域名
-    "URL": "url",                            # URL
-    "EMAIL_ADDRESS": "email-addr",           # 邮箱地址
-    "USER_ACCOUNT": "user-account",          # 用户账户
-    "PROCESS": "process",                    # 进程
-    "NETWORK_TRAFFIC": "network-traffic",    # 网络流量
     "SOFTWARE": "software",                  # 软件 (包括操作系统、中间件等)
 }
 
@@ -69,8 +63,6 @@ REVISED_STIX_RELATIONSHIPS = {
     # 包含关系
     "CONTAINS": "contains",                  # (报告/对象) 包含 (可观察对象)
     "HAS_WEAKNESS": "has-weakness",          # (软件) 有 (弱点)
-    "HAS_PAYLOAD": "has-payload",            # (软件) 有 (有效载荷)
-
 }
 
 # STIX2.0 实体属性关键字（通用属性）

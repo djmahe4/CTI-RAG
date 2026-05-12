@@ -224,6 +224,50 @@ curl -X POST http://localhost:8006/chat/stream \
 
 ---
 
+## 🚦 一期部署工作流补充
+
+### Docker Compose 启动顺序
+
+```bash
+docker compose up -d rabbitmq threatrag threatrag-worker
+```
+
+推荐顺序：
+
+1. 先确认 `rabbitmq` 健康检查通过。
+2. 再启动 `threatrag-worker`，确保后台健康检查与重试任务已有消费者。
+3. 最后滚动 API 服务 `threatrag`，避免 API 提前投递任务但 worker 尚未接管。
+
+### 路由与熔断环境变量
+
+一期运行时默认依赖以下配置：
+
+- `MODEL_ROUTER_ENABLED`
+- `MODEL_ROUTER_DEFAULT_PROVIDER`
+- `MODEL_ROUTER_DEFAULT_MODEL`
+- `MODEL_ROUTER_FALLBACK_CHAIN`
+- `MODEL_CIRCUIT_BREAKER_ENABLED`
+- `MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD`
+- `MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS`
+- `MODEL_CIRCUIT_BREAKER_OPEN_SECONDS`
+- `MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES`
+- `RABBITMQ_URL`
+
+### 聊天响应中的路由字段
+
+无论是快捷流程还是显式会话流程，接口响应里都可能出现以下路由元信息：
+
+- `expected_model_provider`
+- `expected_model_name`
+- `actual_model_provider`
+- `actual_model_name`
+- `degraded`
+- `route_reason`
+
+这些字段可用于前端提示“已回退到备用模型”或记录熔断命中原因。
+
+---
+
 ## 🎯 最佳实践
 
 ### 1. 客户端会话管理
@@ -446,4 +490,3 @@ SELECT * FROM chat_messages WHERE session_id = '<session_id>' ORDER BY created_a
 - [完整 API 文档](chat-session-api.md)
 - [快速开始指南](chat-session-quickstart.md)
 - [模型使用指南](model-usage-examples.md)
-

@@ -1,18 +1,31 @@
-FROM python:3.9-slim
+# syntax=docker/dockerfile:1.7
+FROM python:3.11-slim
+
+# 设置清华镜像源加速Debian包下载
+RUN echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ trixie main contrib non-free-firmware' > /etc/apt/sources.list && \
+    echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian-security/ trixie-security main contrib non-free-firmware' >> /etc/apt/sources.list && \
+    echo 'deb https://mirrors.tuna.tsinghua.edu.cn/debian/ trixie-updates main contrib non-free-firmware' >> /etc/apt/sources.list
 
 WORKDIR /app
 
-# 安装依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# 直接从官方镜像复制 uv 可执行文件，避免在构建阶段额外安装
+COPY --from=ghcr.nju.edu.cn/astral-sh/uv:latest /uv /uvx /bin/
+
+# 安装依赖（使用清华PyPI镜像加速）
+COPY requirements-worker.txt .
+RUN --mount=type=cache,target=/root/.cache/uv,sharing=locked \
+    UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple \
+    UV_HTTP_TIMEOUT=300 \
+    uv pip install --system -r requirements-worker.txt
 
 # 复制应用代码
 COPY . .
 
 # 设置环境变量
 ENV PYTHONPATH=/app
-ENV WORKER_TYPE=all
-ENV WORKER_COUNT=3
+ENV WORKER_TYPE=task
+ENV TASK_WORKER_PREFETCH=1
+ENV TASK_MAX_RETRIES=3
 
 # 启动工作器
 CMD ["python", "worker.py"]

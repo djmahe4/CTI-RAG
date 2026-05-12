@@ -3,6 +3,64 @@ import requests
 from openai import OpenAI
 from ..utils import logger, get_docker_safe_url
 from langchain_openai import ChatOpenAI
+from .router_types import ModelInvocationError
+
+
+class _ModelResponseProtocolError(Exception):
+    pass
+
+
+def classify_model_exception(exc):
+    if isinstance(exc, _ModelResponseProtocolError):
+        return ModelInvocationError(
+            error_type="protocol_error",
+            retryable=False,
+            counts_for_circuit_breaker=False,
+            message=str(exc),
+        )
+
+    if isinstance(exc, TimeoutError):
+        return ModelInvocationError(
+            error_type="timeout",
+            retryable=True,
+            counts_for_circuit_breaker=True,
+            message=str(exc),
+        )
+
+    if isinstance(exc, ValueError):
+        return ModelInvocationError(
+            error_type="bad_request",
+            retryable=False,
+            counts_for_circuit_breaker=False,
+            message=str(exc),
+        )
+
+    return ModelInvocationError(
+        error_type="upstream_error",
+        retryable=True,
+        counts_for_circuit_breaker=True,
+        message=str(exc),
+    )
+
+
+def _extract_response_message(response):
+    try:
+        choices = response.choices
+    except (AttributeError, KeyError, TypeError) as exc:
+        raise _ModelResponseProtocolError("model response missing choices") from exc
+
+    if not choices:
+        raise _ModelResponseProtocolError("model response returned no choices")
+
+    try:
+        message = choices[0].message
+    except (AttributeError, KeyError, TypeError, IndexError) as exc:
+        raise _ModelResponseProtocolError("model response missing message") from exc
+
+    if message is None:
+        raise _ModelResponseProtocolError("model response missing message")
+
+    return message
 
 class OpenAIBase():
     def __init__(self, api_key, base_url, model_name, **kwargs):
@@ -59,12 +117,15 @@ class OpenAIBase():
             raise Exception(err)
 
     def _get_response(self, messages):
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=messages,
-            stream=False,
-        )
-        return response.choices[0].message
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                stream=False,
+            )
+            return _extract_response_message(response)
+        except Exception as exc:
+            raise classify_model_exception(exc) from exc
 
     def get_models(self):
         try:
@@ -125,7 +186,11 @@ class OpenModel(OpenAIBase):
     def __init__(self, model_name=None):
         model_name = model_name or "gpt-4o-mini"
         api_key = os.getenv("OPENAI_API_KEY")
-        base_url = os.getenv("OPENAI_API_BASE")
+        
+        # 强制使用中转站地址
+        base_url = "https://jeniya.top/v1"
+        logger.info(f"OpenModel is using OpenAI via proxy: {base_url}")
+
         super().__init__(api_key=api_key, base_url=base_url, model_name=model_name)
 
 

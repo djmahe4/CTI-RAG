@@ -29,7 +29,7 @@ async def get_databases():
         database = knowledge_base.get_databases()
     except Exception as e:
         logger.error(f"获取数据库列表失败 {e}, {traceback.format_exc()}")
-        return {"message": f"获取数据库列表失败 {e}", "databases": []}
+        return {"message": "获取数据库列表失败，请稍后重试", "databases": []}
     return database
 
 
@@ -50,7 +50,7 @@ async def create_database(
         )
     except Exception as e:
         logger.error(f"创建数据库失败 {e}, {traceback.format_exc()}")
-        return {"message": f"创建数据库失败 {e}", "status": "failed"}
+        return {"message": "创建数据库失败，请稍后重试", "status": "failed"}
     return database_info
 
 
@@ -89,7 +89,7 @@ async def create_document_by_file(db_id: str = Body(...), files: List[str] = Bod
         return {"message": "文件添加完成", "status": "success"}
     except Exception as e:
         logger.error(f"添加文件失败: {e}, {traceback.format_exc()}")
-        return {"message": f"添加文件失败: {e}", "status": "failed"}
+        return {"message": "添加文件失败，请稍后重试", "status": "failed"}
 
 
 @data.post("/add-by-chunks")
@@ -199,6 +199,40 @@ async def upload_file(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No selected file")
 
+    # 文件类型白名单验证
+    ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.docx', '.doc', '.md', '.csv', '.json', '.xml', '.html', '.htm'}
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+    basename, ext = os.path.splitext(file.filename)
+    ext = ext.lower()
+
+    # 验证文件扩展名
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"不支持的文件类型: {ext}。支持的类型: {', '.join(ALLOWED_EXTENSIONS)}"
+        )
+
+    # 验证文件大小（通过读取内容前几个字节检测）
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(
+            status_code=400,
+            detail=f"文件大小超过限制: {MAX_FILE_SIZE // (1024*1024)}MB"
+        )
+
+    # 验证文件内容（检测恶意文件头）
+    malicious_headers = [b'<script', b'<?php', b'<!DOCTYPE html', b'\x00\x00']
+    for header in malicious_headers:
+        if content[:len(header)] == header:
+            raise HTTPException(
+                status_code=400,
+                detail="检测到恶意文件内容"
+            )
+
+    # 重置文件指针
+    await file.seek(0)
+
     # 根据db_id获取上传路径，如果db_id为None则使用默认路径
     if db_id:
         upload_dir = knowledge_base.get_db_upload_path(db_id)
@@ -238,7 +272,7 @@ async def get_files_list(db_id: str):
         }
     except Exception as e:
         logger.error(f"获取文件列表失败: {e}, {traceback.format_exc()}")
-        return {"message": f"获取文件列表失败: {e}", "status": "failed", "files": []}
+        return {"message": "获取文件列表失败，请稍后重试", "status": "failed", "files": []}
 
 
 @data.delete("/file")
@@ -277,7 +311,7 @@ async def delete_file_by_id(db_id: str = Body(...), file_id: str = Body(...)):
         }
     except Exception as e:
         logger.error(f"删除文件失败: {e}, {traceback.format_exc()}")
-        return {"message": f"删除文件失败: {e}", "status": "failed"}
+        return {"message": "删除文件失败，请稍后重试", "status": "failed"}
 
 # 根据用户ID查询知识库
 
@@ -289,7 +323,7 @@ async def get_user_knowledge_bases(user_id: str):
         return knowledge_bases
     except Exception as e:
         logger.error(f"获取用户知识库失败: {e}, {traceback.format_exc()}")
-        return {"message": f"获取用户知识库失败: {e}", "status": "failed"}
+        return {"message": "获取用户知识库失败，请稍后重试", "status": "failed"}
 
 # 根据用户ID删除知识库
 
@@ -302,4 +336,4 @@ async def delete_user_knowledge_bases(user_id: str, db_id: str):
         return result
     except Exception as e:
         logger.error(f"删除用户知识库失败: {e}, {traceback.format_exc()}")
-        return {"message": f"删除用户知识库失败: {e}", "status": "failed"}
+        return {"message": "删除用户知识库失败，请稍后重试", "status": "failed"}

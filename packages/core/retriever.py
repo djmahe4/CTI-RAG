@@ -1,9 +1,11 @@
+import asyncio
+import concurrent.futures
 import traceback
 
 from .. import config
 from .knowledgebase import KnowledgeBase
 from .graphbase import GraphDatabase
-from ..models.rerank_model import get_reranker
+from ..models.rerank_model import get_reranker # 使用标准 reranker (智谱AI/SiliconFlow/Local)
 from ..utils.logging_config import logger
 from ..models import select_model
 from .operators import HyDEOperator
@@ -24,8 +26,13 @@ class Retriever:
         self._load_models()
 
     def _load_models(self):
-        if config.enable_reranker:
+        # 使用标准 reranker (智谱AI / SiliconFlow / Local)
+        try:
             self.reranker = get_reranker(config)
+            logger.info(f"Reranker 初始化成功: {config.reranker}")
+        except Exception as e:
+            logger.error(f"Reranker 初始化失败: {e}")
+            self.reranker = None
 
         if config.enable_web_search:
             self.web_searcher = WebSearcher()
@@ -51,25 +58,29 @@ class Retriever:
         self._load_models()
 
     def hybrid_retrieval(self, query, history, meta):
-        """四阶段混合检索：向量检索 -> 实体链接 -> 图检索 -> 上下文融合"""
-        logger.info("开始四阶段混合检索")
+        """五阶段混合检索：向量检索 -> 实体链接 -> 图检索 -> 重排序 -> 上下文融合"""
+        logger.info("开始五阶段混合检索")
         
         # 阶段1：向量检索 - 广泛的语义召回
         vector_results = self._vector_retrieval_stage(query, history, meta)
         
-        # 阶段2：实体链接 - 从文本片段中提取实体
-        seed_entities = self._entity_linking_stage(vector_results, query, meta)
+        # 阶段2：实体链接 - 从查询和召回文档中提取实体
+        seed_entities = self._entity_linking_stage(query, vector_results, meta)
         
-        # 阶段3：图检索 - 基于种子节点的深度挖掘
-        graph_results = self._graph_retrieval_stage(seed_entities, query, meta)
+        # 阶段3：图检索 - 基于种子实体的邻居发现
+        graph_results, graph_context_list = self._graph_retrieval_stage(seed_entities, query, meta)
         
-        # 阶段4：上下文融合 - 整合向量和图检索结果
-        fused_context = self._context_fusion_stage(vector_results, graph_results, query)
+        # 阶段4: 重排序 - 对所有召回的上下文进行智能排序
+        reranked_context = self._rerank_stage(query, vector_results, graph_context_list, meta)
+
+        # 阶段5：上下文融合 - 整合重排后的结果
+        fused_context = self._context_fusion_stage(reranked_context, query)
         
         return {
             "entities": seed_entities,
             "knowledge_base": vector_results,
             "graph_base": graph_results,
+            "reranked_context": reranked_context, # 添加重排后的上下文用于调试
             "fused_context": fused_context,
             "web_search": self.query_web(query, history, {"meta": meta})
         }
@@ -101,61 +112,76 @@ class Retriever:
         logger.debug(f"向量检索返回 {len(query_result['results'])} 个结果")
         return query_result
 
-    def _entity_linking_stage(self, vector_results, query, meta):
-        """阶段2：实体链接 - 从文本片段中提取实体"""
-        logger.debug("阶段2：实体链接")
+    def _entity_linking_stage(self, query, vector_results, meta):
+        """阶段2：实体链接 - 优化为分块并行处理以降低CPU负载"""
+        logger.debug("阶段2：实体链接 (分块并行模式)")
         
-        if not vector_results.get("results"):
-            return []
+        # 1. 收集所有待处理的文本
+        texts_to_process = [query]
+        if vector_results and vector_results.get("results"):
+            doc_limit = meta.get("entity_extraction_doc_limit", 10)
+            for result in vector_results["results"][:doc_limit]:
+                if isinstance(result, dict) and "entity" in result:
+                    texts_to_process.append(result["entity"]["text"])
         
-        # 合并所有检索到的文本片段
+        # 2. 将文本分块 (每块包含查询 + N个文档)
+        chunk_size = meta.get("entity_extraction_chunk_size", 4) # 每个块包含查询 + 3个文档
         text_chunks = []
-        for result in vector_results["results"]:
-            if isinstance(result, dict) and "entity" in result:
-                text_chunks.append(result["entity"]["text"])
+        # 第一个块总是包含查询
+        base_chunk = [query]
+        # Skip the query itself which is at index 0
+        for i in range(1, len(texts_to_process)):
+            base_chunk.append(texts_to_process[i])
+            if len(base_chunk) >= chunk_size or i == len(texts_to_process) - 1:
+                text_chunks.append("\n".join(base_chunk))
+                base_chunk = [query] # 为下一个块重置，并带上查询
         
-        combined_text = "\n".join(text_chunks)
+        # Handle case where there are few documents and the loop doesn't run
+        if len(base_chunk) > 1 and (len(text_chunks) == 0 or text_chunks[-1] != "\n".join(base_chunk)):
+             text_chunks.append("\n".join(base_chunk))
+
+        logger.info(f"实体链接：将 {len(texts_to_process)-1} 个文档分成了 {len(text_chunks)} 个块进行并行处理。")
+
+        # 3. 并行提取实体
+        all_entities = set()
         
-        # 使用实体提取器从文本中提取实体
+        async def extract_from_chunk(chunk_text):
+            try:
+                stix_entities = await self.entity_extractor.extract_entities(text=chunk_text, language="chinese")
+                keywords = self._extract_keywords_from_text(chunk_text, query)
+                
+                chunk_entities = set(keywords)
+                if stix_entities:
+                    for entity in stix_entities:
+                        if isinstance(entity, dict) and "name" in entity:
+                            chunk_entities.add(entity["name"])
+                return chunk_entities
+            except Exception as e:
+                logger.warning(f"处理块时实体提取失败: {e}")
+                return set()
+
+        async def run_parallel_extraction():
+            tasks = [extract_from_chunk(chunk) for chunk in text_chunks]
+            results = await asyncio.gather(*tasks)
+            for entity_set in results:
+                all_entities.update(entity_set)
+
         try:
-            # 提取STIX实体 - 正确处理异步调用
-            import asyncio
-            import concurrent.futures
-            
-            # 在新的事件循环中运行异步方法
+            # 在线程池中运行异步并行代码
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(
-                    lambda: asyncio.run(self.entity_extractor.extract_entities(
-                        text=combined_text,
-                        language="chinese"
-                    ))
-                )
-                stix_entities = future.result()
+                future = executor.submit(lambda: asyncio.run(run_parallel_extraction()))
+                future.result()
             
-            # 提取关键词实体（用于图检索）
-            keywords = self._extract_keywords_from_text(combined_text, query)
+            # 4. 去重和格式化
+            unique_entities = list(set([e.strip() for e in all_entities if e.strip() and len(e.strip()) > 1]))
             
-            # 合并两种实体
-            all_entities = []
-            
-            # 从STIX实体中提取实体名称
-            for entity in stix_entities:
-                if isinstance(entity, dict) and "name" in entity:
-                    all_entities.append(entity["name"])
-            
-            # 添加关键词
-            all_entities.extend(keywords)
-            
-            # 去重并过滤
-            unique_entities = list(set([e.strip() for e in all_entities if e.strip()]))
-            
-            logger.debug(f"实体链接提取到 {len(unique_entities)} 个实体: {unique_entities[:5]}...")
+            logger.info(f"实体链接成功：从所有块中提取到 {len(unique_entities)} 个唯一实体。")
             return unique_entities
             
         except Exception as e:
-            logger.error(f"实体链接失败: {e}")
+            logger.error(f"实体链接并行处理失败: {e}, {traceback.format_exc()}")
             # 回退到简单的关键词提取
-            return self._extract_keywords_from_text(combined_text, query)
+            return self._extract_keywords_from_text("\n".join(texts_to_process), query)
 
     def _extract_keywords_from_text(self, text, query):
         """从文本中提取关键词"""
@@ -177,40 +203,43 @@ class Retriever:
             return []
 
     def _graph_retrieval_stage(self, seed_entities, query, meta):
-        """阶段3：图检索 - 基于LLM生成Cypher并执行"""
-        logger.debug("阶段3：图检索 (Cypher生成)")
+        """阶段3：图检索 - 基于实体的邻居查询"""
+        logger.debug("阶段3：图检索 (邻居查询)")
         
-        if not seed_entities:
-            return {"results": []}
+        if not seed_entities or not self.graph_base.is_running():
+            return {"results": []}, []
+
+        hops = meta.get("graph_hops", 2)
+        all_graph_results = []
         
         try:
-            # 新增：让LLM根据上下文和实体生成Cypher查询
-            # self.graph_base需要实现generate_cypher_query方法
-            cypher_query = self.graph_base.generate_cypher_query(
-                query=query,
-                entities=seed_entities,
-                graph_schema=self.graph_base.get_schema_str()
-            )
-
-            if not cypher_query:
-                logger.warning("LLM未能生成有效的Cypher查询，图检索被跳过。")
-                return {"results": []}
+            # 对每个种子实体执行邻居查询
+            for entity_name in seed_entities:
+                # 使用 query_specific_entity 进行多跳查询
+                entity_results = self.graph_base.query_specific_entity(
+                    entity_name=entity_name,
+                    hops=hops
+                )
+                if entity_results:
+                    all_graph_results.extend(entity_results)
             
-            logger.info(f"由LLM生成的Cypher查询: {cypher_query}")
+            # 去重和格式化结果
+            unique_results = self._deduplicate_graph_results(all_graph_results)
+            formatted_results = self.graph_base.format_query_result_to_graph(unique_results)
+            
+            # 将图结果转换为文本上下文列表，用于reranker
+            graph_context_list = []
+            if formatted_results and formatted_results.get("edges"):
+                for edge in formatted_results["edges"]:
+                    context_str = f"{edge.get('source_name')}的'{edge.get('type')}'是'{edge.get('target_name')}'"
+                    graph_context_list.append(context_str)
 
-            # 直接执行生成的Cypher查询
-            query_results = self.graph_base.query(cypher_query)
-        
-        # 去重和格式化结果
-            unique_results = self._deduplicate_graph_results(query_results)
-        formatted_results = self.graph_base.format_query_result_to_graph(unique_results)
-        
-            logger.debug(f"图检索返回 {len(formatted_results)} 个格式化结果")
-        return {"results": formatted_results}
+            logger.debug(f"图检索返回 {len(formatted_results.get('edges', []))} 个关系")
+            return formatted_results, graph_context_list
 
         except Exception as e:
             logger.error(f"图检索阶段失败: {e}, {traceback.format_exc()}")
-            return {"results": []}
+            return {"results": []}, []
 
     def _deduplicate_graph_results(self, results):
         """对图检索结果进行去重"""
@@ -232,38 +261,109 @@ class Retriever:
         
         return unique_results
 
-    def _context_fusion_stage(self, vector_results, graph_results, query):
-        """阶段4：上下文融合 - 整合向量和图检索结果"""
-        logger.debug("阶段4：上下文融合")
+    def _rerank_stage(self, query: str, vector_results, graph_context_list: list, meta: dict) -> str:
+        """阶段4: 重排序 - 对所有候选上下文进行打分和排序（使用智谱AI Reranker）"""
+        logger.info("阶段4: 重排序开始")
         
-        # 构建向量检索的上下文
-        vector_context = []
-        if vector_results.get("results"):
-            for i, result in enumerate(vector_results["results"][:10]):  # 限制前10个
-                if isinstance(result, dict) and "entity" in result:
-                    vector_context.append(f"[文档{i+1}] {result['entity']['text']}")
+        if not self.reranker:
+            error_msg = "Reranker 未初始化！请检查配置文件和 API Key 是否正确。"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+        # 1. 收集所有候选文档
+        candidate_docs = []
+        # 从向量检索结果中提取文本
+        if vector_results and vector_results.get("results"):
+            for res in vector_results["results"]:
+                if isinstance(res, dict) and res.get("entity"):
+                    candidate_docs.append(res["entity"]["text"])
         
-        # 构建图检索的上下文
-        graph_context = []
-        if graph_results.get("results"):
-            if isinstance(graph_results["results"], dict) and graph_results["results"].get("edges"):
-                for edge in graph_results["results"]["edges"][:10]:  # 限制前10个
-                    graph_context.append(f"{edge['source_name']} -> {edge['target_name']}: {edge['type']}")
-            elif isinstance(graph_results["results"], list):
-                for i, item in enumerate(graph_results["results"][:10]):
-                    if isinstance(item, dict):
-                        source = item.get('source_name', '')
-                        target = item.get('target_name', '')
-                        rel_type = item.get('type', '')
-                        if source and target and rel_type:
-                            graph_context.append(f"{source} -> {target}: {rel_type}")
+        # 添加图检索结果
+        candidate_docs.extend(graph_context_list)
         
-        # 融合上下文
+        # 去重
+        unique_docs = list(dict.fromkeys(candidate_docs))
+        
+        logger.info(f"收集到 {len(unique_docs)} 个唯一文档准备重排序 (向量: {len(candidate_docs) - len(graph_context_list)}, 图: {len(graph_context_list)})")
+        
+        # --- 新增：API请求保护逻辑 ---
+        # 根据智谱API限制，保护请求不会超限
+        reranker_max_docs = meta.get("reranker_max_docs", 100)  # API上限128，我们用100作为安全值
+        reranker_max_length = meta.get("reranker_max_length", 30000) # API上限32k，我们用30k作为安全值
+
+        # 1. 硬性限制文档数量
+        if len(unique_docs) > reranker_max_docs:
+            logger.warning(f"Reranker: 待重排文档数 ({len(unique_docs)}) 超出上限 ({reranker_max_docs})，将进行截断。")
+            unique_docs = unique_docs[:reranker_max_docs]
+
+        # 2. 检查并确保总文本长度不超限
+        current_length = len(query)
+        docs_for_rerank = []
+        for doc in unique_docs:
+            if current_length + len(doc) > reranker_max_length:
+                logger.warning(f"Reranker: 文本总长度达到上限 ({reranker_max_length})，已停止添加更多文档。最终数量: {len(docs_for_rerank)}。")
+                break
+            docs_for_rerank.append(doc)
+            current_length += len(doc)
+        
+        unique_docs = docs_for_rerank
+        logger.info(f"Reranker: 最终将使用 {len(unique_docs)} 个文档进行重排序，总长度约为 {current_length} 字符。")
+        # --- 保护逻辑结束 ---
+
+        if not unique_docs:
+            logger.warning("没有候选文档需要重排序")
+            return ""
+
+        # 2. 调用reranker模型 (使用 compute_score API)
+        rerank_top_k = config.RERANK_TOP_K
+        logger.info(f"调用 Reranker 模型，top_k={rerank_top_k}")
+        
+        # reranker.compute_score 接受 [query, [doc1, doc2, ...]] 格式
+        sentence_pairs = [query, unique_docs]
+        scores = self.reranker.compute_score(sentence_pairs, normalize=True)
+        
+        if not scores or len(scores) == 0:
+            error_msg = f"Reranker 返回空结果！查询='{query[:50]}', 文档数={len(unique_docs)}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+        
+        # 3. 将文档和分数配对并排序
+        doc_score_pairs = list(zip(unique_docs, scores))
+        sorted_pairs = sorted(doc_score_pairs, key=lambda x: x[1], reverse=True)
+        
+        # 取 top_k 个结果
+        top_pairs = sorted_pairs[:rerank_top_k]
+        
+        logger.info(f"Reranker 成功返回 {len(scores)} 个分数，选取 top {len(top_pairs)} 个结果")
+        context_parts = []
+        for i, (doc, score) in enumerate(top_pairs):
+            logger.info(f"重排结果 {i+1}: 分数={score:.4f}, 文档长度={len(doc)}")
+            context_parts.append(f"[重排结果 {i+1}, 分数: {score:.4f}]: {doc}")
+        
+        final_context = "\n\n".join(context_parts)
+        logger.info(f"重排序完成，最终上下文包含 {len(top_pairs)} 个片段，总长度 {len(final_context)} 字符")
+        
+        return final_context
+
+    def _context_fusion_stage(self, reranked_context: str, query: str):
+        """阶段5：上下文融合 - 基于重排后的结果构建最终上下文"""
+        logger.debug("阶段5：上下文融合")
+        
+        # 在新流程中，上下文已经在rerank阶段格式化好了
+        # 这里主要是为了保持结构完整性，并可以添加总结信息
+        if not reranked_context:
+            return {
+                "final_context": "",
+                "query": query,
+                "summary": "未能根据查询检索到任何相关信息。"
+            }
+            
+        summary = f"基于查询 '{query}', 已对所有召回信息进行重排序并选取了最相关的结果作为上下文。"
+
         fused_context = {
-            "vector_context": "\n".join(vector_context),
-            "graph_context": "\n".join(graph_context),
+            "final_context": reranked_context,
             "query": query,
-            "summary": f"基于查询'{query}'，检索到{len(vector_context)}个相关文档片段和{len(graph_context)}个图关系"
+            "summary": summary
         }
         
         logger.debug(f"上下文融合完成: {fused_context['summary']}")
@@ -281,32 +381,27 @@ class Retriever:
             # 如果不显示检索结果信息，直接返回原始查询
             return query
 
-        # 检查是否使用了四阶段检索
-        if refs.get("fused_context"):
+        # 检查是否使用了新的混合检索流程 (通过reranked_context判断)
+        if refs.get("fused_context") and "final_context" in refs["fused_context"]:
             return self._construct_hybrid_query(query, refs, meta)
         else:
             return self._construct_traditional_query(query, refs, meta)
 
     def _construct_hybrid_query(self, query, refs, meta):
-        """构造四阶段检索的查询"""
+        """构造新版混合检索的查询"""
         fused_context = refs.get("fused_context", {})
+        final_context = fused_context.get("final_context", "")
         external_parts = []
         
-        # 添加向量检索的上下文
-        vector_context = fused_context.get("vector_context", "")
-        if vector_context:
-            external_parts.extend(["相关文档信息:", vector_context])
-        
-        # 添加图检索的上下文
-        graph_context = fused_context.get("graph_context", "")
-        if graph_context:
-            external_parts.extend(["知识图谱关系:", graph_context])
+        if final_context:
+            # 新的上下文已经包含了来源和排序信息
+            external_parts.extend(["根据以下经过重排序的上下文信息:", final_context])
         
         # 添加网络搜索的结果
         web_res = refs.get("web_search", {}).get("results", [])
         if web_res:
             web_text = "\n".join(f"{r['title']}: {r['content']}" for r in web_res)
-            external_parts.extend(["网络搜索信息:", web_text])
+            external_parts.extend(["补充的网络搜索信息:", web_text])
         
         # 构造查询
         if external_parts:

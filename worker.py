@@ -3,8 +3,7 @@ import sys
 import time
 import logging
 from dotenv import load_dotenv
-from rag.mq.conversation_worker import ConversationWorker
-from rag.mq.vector_search_worker import VectorSearchWorker
+from rag.mq.task_worker import TaskWorker
 
 # 加载环境变量
 load_dotenv()
@@ -16,19 +15,29 @@ logger = logging.getLogger(__name__)
 def main():
     """工作器主函数"""
     # 获取工作器类型和数量
-    worker_type = os.getenv("WORKER_TYPE", "all").lower()
+    worker_type = os.getenv("WORKER_TYPE", "task").lower()
     worker_count = int(os.getenv("WORKER_COUNT", "3"))
     
     logger.info(f"启动工作器: 类型={worker_type}, 数量={worker_count}")
+
+    if worker_type in ["task", "tasks"]:
+        task_worker = TaskWorker()
+        logger.info("启动后台任务工作器")
+        task_worker.run()
+        return
     
     # 启动会话工作器
     if worker_type in ["conversation", "all"]:
+        from rag.mq.conversation_worker import ConversationWorker
+
         conversation_worker = ConversationWorker(num_workers=worker_count)
         conversation_worker.start_workers()
         logger.info(f"已启动 {worker_count} 个会话工作器")
     
     # 启动向量检索工作器
     if worker_type in ["vector", "all"]:
+        from rag.mq.vector_search_worker import VectorSearchWorker
+
         vector_worker = VectorSearchWorker(num_workers=worker_count)
         vector_worker.start_workers()
         logger.info(f"已启动 {worker_count} 个向量检索工作器")

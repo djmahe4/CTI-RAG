@@ -1,0 +1,9 @@
+data/
+models/
+data/ollama
+data/milvus
+data/neo4j
+data/minio
+data/mysql
+data/redis
+neo4j_data_bak/*

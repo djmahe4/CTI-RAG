@@ -69,6 +69,36 @@ class Config(SimpleConfig):
         self.add_item("model_local_paths", default={}, des="本地模型路径")
         self.add_item("use_rewrite_query", default="off", des="重写查询", choices=["off", "on", "hyde"])
         self.add_item("device", default="cuda", des="运行本地模型的设备", choices=["cpu", "cuda"])
+        self.add_item("RERANK_TOP_K", default=5, des="重排序后返回的文档数量")
+        # 强化学习推理相关配置
+        self.add_item(
+            "rl_base_model_path",
+            default="models/reasoning_model/Qwen2.5-3B-Instruct",
+            des="RL 基础模型路径"
+        )
+        self.add_item(
+            "rl_lora_path",
+            default="models/reasoning_model/final_lora",
+            des="RL LoRA 权重路径"
+        )
+        self.add_item(
+            "rl_policy_checkpoint_path",
+            default="models/reasoning_model/rl_policy_path_match/best_policy.pt",
+            des="RL 策略网络 checkpoint"
+        )
+        self.add_item(
+            "rl_adjacency_path",
+            default="RL/cache/adjacency.json",
+            des="RL 图谱邻接缓存路径"
+        )
+        self.add_item(
+            "rl_device",
+            default="cuda",
+            des="RL 推理设备",
+            choices=["cpu", "cuda"]
+        )
+        self.add_item("rl_max_steps", default=4, des="RL 推理最大步数")
+        self.add_item("rl_candidate_top_k", default=3, des="RL 起始实体候选数量")
         ### <<< 默认配置结束
 
         self.load()
@@ -143,7 +173,7 @@ class Config(SimpleConfig):
             },
             "EMBED_MODEL_INFO": {
                 k: v for k, v in _models["EMBED_MODEL_INFO"].items()
-                if k.startswith(("deepseek/", "zhipu/", "local/")) or k in ["deepseek", "zhipu", "local"]
+                if k.startswith(("deepseek/", "zhipu/", "local/", "dashscope/")) or k in ["deepseek", "zhipu", "local", "dashscope"]
             },
             "RERANKER_LIST": {
                 k: v for k, v in _models["RERANKER_LIST"].items()

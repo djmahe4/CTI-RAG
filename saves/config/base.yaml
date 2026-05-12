@@ -16,8 +16,8 @@ model_name: "deepseek-chat"
 # 嵌入模型
 embed_model: "local/BAAI/bge-m3"
 
-# Reranker 模型 - 使用相同的bge-m3模型
-reranker: "local/BAAI/bge-m3"
+# Reranker 模型 - 使用智谱AI重排序模型
+reranker: "zhipu/rerank"
 model_local_paths:
   local/BAAI/bge-m3: "models/embedding_model/bge-m3"
 

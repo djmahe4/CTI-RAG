@@ -39,6 +39,27 @@ services:
       timeout: 5s
       retries: 3
 
+  # RabbitMQ 后台任务与健康检查通道
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: threatrag-rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    networks:
+      - threatrag-network
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   # Neo4j图数据库
   neo4j:
     image: docker1.aeko.cn/neo4j:5.15-community
@@ -46,15 +67,20 @@ services:
     restart: unless-stopped
     environment:
       NEO4J_AUTH: neo4j/12345678
-      NEO4J_PLUGINS: '["graph-data-science"]'
-      NEO4J_dbms_security_procedures_unrestricted: gds.*
-      NEO4J_dbms_security_procedures_allowlist: gds.*
+      NEO4J_PLUGINS: '["graph-data-science","apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: gds.*,apoc.*
+      NEO4J_dbms_security_procedures_allowlist: gds.*,apoc.*
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
     ports:
       - "7475:7474" # HTTP
       - "7688:7687" # Bolt
     volumes:
       - ./data/neo4j/data:/data
       - ./data/neo4j/logs:/logs
+      - ./data/neo4j/plugins:/plugins
+      - ./data/neo4j/import:/import
     networks:
       - threatrag-network
     healthcheck:
@@ -129,7 +155,7 @@ services:
 
   # Ollama 本地模型服务（GPU版本）
   ollama:
-    image: docker1.aeko.cn/ollama/ollama:latest
+    image: ollama/ollama:latest
     container_name: threatrag-ollama
     restart: unless-stopped
     ports:
@@ -138,20 +164,20 @@ services:
       - ./data/ollama:/root/.ollama
     networks:
       - threatrag-network
-    # GPU 支持已启用
+    # GPU 支持
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all  # 使用所有可用GPU
-              capabilities: [gpu]
+              count: all
+              capabilities: [ gpu ]
     healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
+      test: [ "CMD-SHELL", "ollama list || exit 1" ]
       interval: 30s
       timeout: 10s
       retries: 5
-      start_period: 60s  # 给 Ollama 更多启动时间
+      start_period: 60s # 给 Ollama 更多启动时间
 
   # ThreatRAG API服务
   threatrag:
@@ -160,6 +186,8 @@ services:
       dockerfile: Dockerfile
     container_name: threatrag-api
     restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8006:8000"
     env_file:
@@ -178,6 +206,29 @@ services:
       - MYSQL_USER=mysql
       - MYSQL_PASSWORD=12345678
       - REDIS_URL=redis://redis:6379
+      - MODEL_ROUTER_ENABLED=${MODEL_ROUTER_ENABLED:-true}
+      - MODEL_ROUTER_DEFAULT_PROVIDER=${MODEL_ROUTER_DEFAULT_PROVIDER:-deepseek}
+      - MODEL_ROUTER_DEFAULT_MODEL=${MODEL_ROUTER_DEFAULT_MODEL:-deepseek-chat}
+      - MODEL_ROUTER_FALLBACK_CHAIN=${MODEL_ROUTER_FALLBACK_CHAIN:-deepseek:deepseek-chat,ollama:qwen3:30b,ollama:qwen2.5:7b}
+      - MODEL_ROUTER_REQUEST_TIMEOUT_SECONDS=${MODEL_ROUTER_REQUEST_TIMEOUT_SECONDS:-45}
+      - MODEL_ROUTER_STREAM_TIMEOUT_SECONDS=${MODEL_ROUTER_STREAM_TIMEOUT_SECONDS:-90}
+      - MODEL_ROUTER_MAX_RETRIES_PER_MODEL=${MODEL_ROUTER_MAX_RETRIES_PER_MODEL:-1}
+      - MODEL_CIRCUIT_BREAKER_ENABLED=${MODEL_CIRCUIT_BREAKER_ENABLED:-true}
+      - MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD=${MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD:-5}
+      - MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS=${MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS:-60}
+      - MODEL_CIRCUIT_BREAKER_OPEN_SECONDS=${MODEL_CIRCUIT_BREAKER_OPEN_SECONDS:-120}
+      - MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES=${MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES:-2}
+      - RUNTIME_REDIS_PREFIX=${RUNTIME_REDIS_PREFIX:-threatrag:runtime}
+      - MODEL_STATUS_TTL_SECONDS=${MODEL_STATUS_TTL_SECONDS:-600}
+      - REQUEST_IDEMPOTENCY_TTL_SECONDS=${REQUEST_IDEMPOTENCY_TTL_SECONDS:-300}
+      - SHORT_CACHE_TTL_SECONDS=${SHORT_CACHE_TTL_SECONDS:-120}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - RABBITMQ_TASK_EXCHANGE=${RABBITMQ_TASK_EXCHANGE:-threatrag.tasks}
+      - RABBITMQ_TASK_QUEUE=${RABBITMQ_TASK_QUEUE:-threatrag.tasks.main}
+      - RABBITMQ_RETRY_QUEUE=${RABBITMQ_RETRY_QUEUE:-threatrag.tasks.retry}
+      - RABBITMQ_DLQ=${RABBITMQ_DLQ:-threatrag.tasks.dlq}
+      - RABBITMQ_MAX_RETRIES=${RABBITMQ_MAX_RETRIES:-3}
+      - RABBITMQ_RETRY_DELAY_MS=${RABBITMQ_RETRY_DELAY_MS:-10000}
       - BASE_MODEL=${BASE_MODEL:-deepseek-ai/DeepSeek-V3}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - ZHIPUAI_API_KEY=${ZHIPUAI_API_KEY}
@@ -188,6 +239,9 @@ services:
       - SESSION_EXPIRE_TIME=${SESSION_EXPIRE_TIME:-3600}
       - MAX_HISTORY_LENGTH=${MAX_HISTORY_LENGTH:-50}
       - MAX_CONCURRENT_CHATS=${MAX_CONCURRENT_CHATS:-20}
+      - NVIDIA_VISIBLE_DEVICES=all
+      - SUBGRAPH_SERVICE_URL=http://host.docker.internal:8013/prune_subgraph
+
     volumes:
       - ./data:/app/data
       - ./models:/app/models
@@ -198,6 +252,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
       neo4j:
         condition: service_healthy
       milvus-standalone:
@@ -206,6 +262,13 @@ services:
         condition: service_healthy
     networks:
       - threatrag-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [ gpu ]
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 300s
@@ -218,11 +281,65 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ThreatRAG 后台任务工作器
+  threatrag-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: threatrag-worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PYTHONPATH=/app
+      - FASTAPI_ENV=${FASTAPI_ENV:-production}
+      - WORKER_TYPE=${WORKER_TYPE:-task}
+      - WORKER_COUNT=${WORKER_COUNT:-3}
+      - REDIS_URL=redis://redis:6379
+      - MODEL_ROUTER_ENABLED=${MODEL_ROUTER_ENABLED:-true}
+      - MODEL_ROUTER_DEFAULT_PROVIDER=${MODEL_ROUTER_DEFAULT_PROVIDER:-deepseek}
+      - MODEL_ROUTER_DEFAULT_MODEL=${MODEL_ROUTER_DEFAULT_MODEL:-deepseek-chat}
+      - MODEL_ROUTER_FALLBACK_CHAIN=${MODEL_ROUTER_FALLBACK_CHAIN:-deepseek:deepseek-chat,ollama:qwen3:30b,ollama:qwen2.5:7b}
+      - MODEL_ROUTER_REQUEST_TIMEOUT_SECONDS=${MODEL_ROUTER_REQUEST_TIMEOUT_SECONDS:-45}
+      - MODEL_ROUTER_STREAM_TIMEOUT_SECONDS=${MODEL_ROUTER_STREAM_TIMEOUT_SECONDS:-90}
+      - MODEL_ROUTER_MAX_RETRIES_PER_MODEL=${MODEL_ROUTER_MAX_RETRIES_PER_MODEL:-1}
+      - MODEL_CIRCUIT_BREAKER_ENABLED=${MODEL_CIRCUIT_BREAKER_ENABLED:-true}
+      - MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD=${MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD:-5}
+      - MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS=${MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS:-60}
+      - MODEL_CIRCUIT_BREAKER_OPEN_SECONDS=${MODEL_CIRCUIT_BREAKER_OPEN_SECONDS:-120}
+      - MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES=${MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES:-2}
+      - RUNTIME_REDIS_PREFIX=${RUNTIME_REDIS_PREFIX:-threatrag:runtime}
+      - MODEL_STATUS_TTL_SECONDS=${MODEL_STATUS_TTL_SECONDS:-600}
+      - REQUEST_IDEMPOTENCY_TTL_SECONDS=${REQUEST_IDEMPOTENCY_TTL_SECONDS:-300}
+      - SHORT_CACHE_TTL_SECONDS=${SHORT_CACHE_TTL_SECONDS:-120}
+      - RABBITMQ_URL=${RABBITMQ_URL:-amqp://guest:guest@rabbitmq:5672/}
+      - RABBITMQ_TASK_EXCHANGE=${RABBITMQ_TASK_EXCHANGE:-threatrag.tasks}
+      - RABBITMQ_TASK_QUEUE=${RABBITMQ_TASK_QUEUE:-threatrag.tasks.main}
+      - RABBITMQ_RETRY_QUEUE=${RABBITMQ_RETRY_QUEUE:-threatrag.tasks.retry}
+      - RABBITMQ_DLQ=${RABBITMQ_DLQ:-threatrag.tasks.dlq}
+      - RABBITMQ_MAX_RETRIES=${RABBITMQ_MAX_RETRIES:-3}
+      - RABBITMQ_RETRY_DELAY_MS=${RABBITMQ_RETRY_DELAY_MS:-10000}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - ZHIPUAI_API_KEY=${ZHIPUAI_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      - SILICONFLOW_API_BASE=${SILICONFLOW_API_BASE:-https://api.siliconflow.cn/v1}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE:-http://ollama:11434}
+    volumes:
+      - ./data:/app/data
+      - ./models:/app/models
+      - ./config.yaml:/app/config.yaml
+      - ./scripts:/app/scripts
+    depends_on:
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      - threatrag-network
+
 networks:
   threatrag-network:
     driver: bridge
-
-# 所有数据现在挂载到本地 ./data 目录
-# volumes 部分已移除，改为使用本地目录挂载
-
-

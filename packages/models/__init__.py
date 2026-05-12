@@ -3,6 +3,7 @@ import traceback
 from .. import config
 from ..utils.logging_config import logger
 from .chat_model import OpenAIBase
+from .router import ModelRouter, ModelRoutingUnavailableError, RoutedPrediction
 
 
 def select_model(model_provider=None, model_name=None):
@@ -18,16 +19,20 @@ def select_model(model_provider=None, model_name=None):
     if model_provider is None:
         raise ValueError("Model provider not specified, please modify `model_provider` in `src/config/base.yaml`")
 
-    # OpenAI 官方
+    # OpenAI 官方 (通过中转站)
     if model_provider == "openai":
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables")
         
+        # 使用中转站地址（可配置）
+        base_url = os.getenv("OPENAI_BASE_URL", "https://jeniya.top/v1")
+        logger.info(f"Using OpenAI via proxy: {base_url}")
+
         model = OpenAIBase(
             api_key=api_key,
-            base_url="https://api.openai.com/v1",
-            model_name=model_name or "gpt-4o-mini",
+            base_url=base_url,
+            model_name=model_name or "gpt-4o-mini", # 根据您的示例，默认模型设置为 gpt-4.1
         )
         return model
     
@@ -37,7 +42,7 @@ def select_model(model_provider=None, model_name=None):
         model = OpenAIBase(
             api_key="ollama",  # Ollama 不需要真实 API Key
             base_url=f"{ollama_base}/v1",
-            model_name=model_name or "llama3.1:8b",  # 默认使用 Llama 3.1
+            model_name=model_name or "qwen3:30b",  # 默认使用 qwen3.5 30b
         )
         return model
 
@@ -65,3 +70,7 @@ def select_model(model_provider=None, model_name=None):
         return model
     except Exception as e:
         raise ValueError(f"Model provider {model_provider} load failed, {e} \n {traceback.format_exc()}")
+
+
+def build_model_router(config=None, runtime_store=None, factory=None):
+    return ModelRouter(config=config, runtime_store=runtime_store, factory=factory)
