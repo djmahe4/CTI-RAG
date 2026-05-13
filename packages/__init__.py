@@ -1,12 +1,12 @@
 from concurrent.futures import ThreadPoolExecutor
 executor = ThreadPoolExecutor()
 
-# 加载环境变量
+# Load Environmental Variables
 import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 获取项目根目录并加载.env文件
+# Fetch project root directory and load.env files
 def get_project_root():
     current_path = Path(__file__).resolve()
     root_indicators = ['.git', 'requirements.txt', 'pyproject.toml', 'setup.py', 'README.md']
@@ -21,14 +21,14 @@ project_root = get_project_root()
 env_path = os.path.join(project_root, '.env')
 if os.path.exists(env_path):
     load_dotenv(env_path)
-    print(f"✓ 已加载环境变量文件: {env_path}")
+    print(f"Loaded Environment Variable File: {env_path}")
 else:
-    print(f"⚠️ 环境变量文件不存在: {env_path}")
+    print(f"Warning: Environment variable file does not exist: {env_path}")
 
 from packages.config import Config
 config = Config()
 
-# 延迟导入其他模块，避免在导入时就初始化所有依赖
+# Delay importing other modules to avoid initializing all dependencies at import
 class LazyLoader:
     def __init__(self):
         self._knowledge_base = None
@@ -56,10 +56,10 @@ class LazyLoader:
             self._retriever = Retriever()
         return self._retriever
 
-# 创建延迟加载器实例
+# Create instance of delayed loader
 _lazy = LazyLoader()
 
-# 为了向后兼容，提供模块级别的访问
+# Provision of modular-level access for backward compatibility
 def __getattr__(name):
     if name == 'knowledge_base':
         return _lazy.knowledge_base
