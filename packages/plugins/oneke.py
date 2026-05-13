@@ -16,18 +16,18 @@ from ..utils import logger
 dotenv.load_dotenv()
 
 instruction_mapper = {
-    'NERzh': "你是专门进行实体抽取的专家。请从input中抽取出符合schema定义的实体，不存在的实体类型返回空列表。请按照JSON字符串的格式回答。",
-    'REzh': "你是专门进行关系抽取的专家。请从input中抽取出符合schema定义的关系三元组。请按照JSON字符串的格式回答。",
-    'EEzh': "你是专门进行事件提取的专家。请从input中抽取出符合schema定义的事件，不存在的事件返回空列表，不存在的论元返回NAN，如果论元存在多值请返回列表。请按照JSON字符串的格式回答。",
-    'EETzh': "你是专门进行事件提取的专家。请从input中抽取出符合schema定义的事件类型及事件触发词，不存在的事件返回空列表。请按照JSON字符串的格式回答。",
-    'EEAzh': "你是专门进行事件论元提取的专家。请从input中抽取出符合schema定义的事件论元及论元角色，不存在的论元返回NAN或空字典，如果论元存在多值请返回列表。请按照JSON字符串的格式回答。",
-    'KGzh': '你是一个图谱实体知识结构化专家。根据输入实体类型(entity type)的schema描述，从文本中抽取出相应的实体实例和其属性信息，不存在的属性不输出, 属性存在多值就返回列表，并输出为可解析的json格式。',
+    'NERzh': "You are an expert in named entity recognition. Please extract entities that match the schema definition from the input. Return an empty list if the entity type does not exist. Please respond in the format of a JSON string.",
+    'REzh': "You are an expert in relationship extraction. Please extract relationship triples that match the schema definition from the input. Return an empty list for relationships that do not exist. Please respond in the format of a JSON string.",
+    'EEzh': "You are an expert in event extraction. Please extract events from the input that conform to the schema definition. Return an empty list for events that do not exist, and return NAN for arguments that do not exist. If an argument has multiple values, please return a list. Respond in the format of a JSON string.",
+    'EETzh': "You are an expert in event extraction. Please extract event types and event trigger words from the input that conform to the schema definition. Return an empty list for non-existent events. Please respond in the format of a JSON string.",
+    'EEAzh': "You are an expert in event argument extraction. Please extract event arguments and their roles from the input that conform to the schema definition, which already includes event trigger words. If an argument does not exist, return NAN or an empty dictionary. Please respond in the format of a JSON string.",
+    'KGzh': "You are an expert in structured knowledge systems for graph entities. Based on the schema description of the input entity type, you extract the corresponding entity instances and their attribute information from the text. Attributes that do not exist should not be output. If an attribute has multiple values, a list should be returned. The results should be output in a parsable JSON format.",
     'NERen': "You are an expert in named entity recognition. Please extract entities that match the schema definition from the input. Return an empty list if the entity type does not exist. Please respond in the format of a JSON string.",
     'REen': "You are an expert in relationship extraction. Please extract relationship triples that match the schema definition from the input. Return an empty list for relationships that do not exist. Please respond in the format of a JSON string.",
     'EEen': "You are an expert in event extraction. Please extract events from the input that conform to the schema definition. Return an empty list for events that do not exist, and return NAN for arguments that do not exist. If an argument has multiple values, please return a list. Respond in the format of a JSON string.",
     'EETen': "You are an expert in event extraction. Please extract event types and event trigger words from the input that conform to the schema definition. Return an empty list for non-existent events. Please respond in the format of a JSON string.",
     'EEAen': "You are an expert in event argument extraction. Please extract event arguments and their roles from the input that conform to the schema definition, which already includes event trigger words. If an argument does not exist, return NAN or an empty dictionary. Please respond in the format of a JSON string.",
-    'KGen': 'You are an expert in structured knowledge systems for graph entities. Based on the schema description of the input entity type, you extract the corresponding entity instances and their attribute information from the text. Attributes that do not exist should not be output. If an attribute has multiple values, a list should be returned. The results should be output in a parsable JSON format.',
+    'KGen': "You are an expert in structured knowledge systems for graph entities. Based on the schema description of the input entity type, you extract the corresponding entity instances and their attribute information from the text. Attributes that do not exist should not be output. If an attribute has multiple values, a list should be returned. The results should be output in a parsable JSON format.",
 }
 
 split_num_mapper = {
@@ -119,14 +119,14 @@ class OneKE:
             text = chunk
             schema = [
                 {
-                    "entity_type": "食品",
+                    "entity_type": "Food",
                     "attributes": {
-                        "名称": "食品的名称，包括品牌名、通用名称或专业化学名",
-                        "分类": "食品所属的类型，例如水果、蔬菜、肉类、谷物、调料、添加剂、益生菌等",
-                        "成分": "食品的主要成分，详细列出包括天然成分、添加剂、保鲜剂、营养强化剂等",
-                        "营养价值": "食品的营养成分，概括其提供的能量和主要营养素，如蛋白质、脂肪、碳水化合物、维生素和矿物质",
-                        "加工方式": "食品的处理或制备方法，包括日常烹饪、加工处理及实验室制备方式等",
-                        "作用或食用效果": "食品对健康或身体的影响，可能的功效或用途"
+                        "Name": "Name of food, including brand names, common or technical chemical names",
+                        "Classification": "Type of food, such as fruit, vegetable, meat, cereal, spice, additive, probiotic, etc.",
+                        "Component": "Main ingredients of food, listing natural components, additives, preservatives, nutritional fortifiers, etc.",
+                        "Nutritional value": "Nutritional composition, summarizing energy and major nutrients like protein, fat, carbohydrates, vitamins, and minerals",
+                        "Process": "Treatment or preparation method, including daily cooking, processing, and laboratory preparation",
+                        "Effect": "Impact on health or body, possible efficacy or uses"
                     }
                 }
             ]
@@ -138,7 +138,7 @@ class OneKE:
                 for entry in formatted_output:
                     f.write(json.dumps(entry, ensure_ascii=False) + '\n')
 
-        print(f"预测结果已添加到 {output_path} 文件中。")
+        print(f"Prediction results added to {output_path} file.")
         return output_path
 
 def read_and_process_chars(file_path, char_size=512, overlap_size=100):
@@ -218,23 +218,23 @@ if __name__ == "__main__":
         text = chunk
 
         # schema = {
-        #     "定义": "描述食品的起源、传统制作方法、文化象征意义或者描述食品或相关事物的定义或含义。包括食品的来源、特点及其在特定文化或背景下的意义。",
-        #     "组成成分": "描述食品的组成部分或成分，包括主要成分、微量成分、添加剂等，揭示食品的化学或物理组成。",
-        #     "功能": "描述食品或其成分的功能或作用，包括其对人体健康的影响、在烹饪中的用途、药用价值等。",
-        #     "属性": "描述食品或其成分的特性或属性，揭示其独特的营养价值、口感特点、保存方式等，包括食品的营养价值、口感特点（如口感丰富、清淡等）、保存方式（如冷藏、冷冻、干燥等）",
-        #     "种类": "描述食品或相关事物的种类或类别，揭示其分类体系、不同类型的特点及其在具体应用中的区别。"
+        #     "Definition": "Describes the origin of food, traditional production methods, cultural symbolism, or the definition/meaning of food or related items.",
+        #     "Components": "Describes the parts or ingredients of food, including major components, trace elements, additives, etc.",
+        #     "Function": "Describes the function or effect of food or its components, including health impact, culinary use, medicinal value, etc.",
+        #     "Attributes": "Describes characteristics or properties like nutritional value, taste (e.g., rich, light), preservation methods (e.g., refrigeration, drying).",
+        #     "Category": "Describes the type or category of food, revealing its classification system and application differences."
         # }
 
         schema = [
             {
-                "entity_type": "食品",
+                "entity_type": "Food",
                 "attributes": {
-                    "名称": "食品的名称，包括品牌名、通用名称或专业化学名",
-                    "分类": "食品所属的类型，例如水果、蔬菜、肉类、谷物、调料、添加剂、益生菌等",
-                    "成分": "食品的主要成分，详细列出包括天然成分、添加剂、保鲜剂、营养强化剂等",
-                    "营养价值": "食品的营养成分，概括其提供的能量和主要营养素，如蛋白质、脂肪、碳水化合物、维生素和矿物质",
-                    "加工方式": "食品的处理或制备方法，包括日常烹饪、加工处理及实验室制备方式等",
-                    "作用或食用效果": "食品对健康或身体的影响，可能的功效或用途"
+                    "Name": "Name of food, including brand names, common or technical chemical names",
+                    "Classification": "Type of food, such as fruit, vegetable, meat, cereal, spice, additive, probiotic, etc.",
+                    "Component": "Main ingredients of food, listing natural components, additives, preservatives, nutritional fortifiers, etc.",
+                    "Nutritional value": "Nutritional composition, summarizing energy and major nutrients like protein, fat, carbohydrates, vitamins, and minerals",
+                    "Process": "Treatment or preparation method, including daily cooking, processing, and laboratory preparation",
+                    "Effect": "Impact on health or body, possible efficacy or uses"
                 }
             }
         ]
@@ -246,4 +246,4 @@ if __name__ == "__main__":
             for entry in formatted_output:
                 f.write(json.dumps(entry, ensure_ascii=False) + '\n')
 
-    print(f"预测结果已添加到 {output_path} 文件中。")
+    print(f"Prediction results added to {output_path} file.")

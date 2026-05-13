@@ -7,25 +7,25 @@ import time
 Base = declarative_base()
 
 class KnowledgeDatabase(Base):
-    """知识库模型"""
+    """Knowledge base model"""
     __tablename__ = 'knowledge_databases'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    db_id = Column(String(255), nullable=False, unique=True, index=True)  # 数据库ID
-    name = Column(String(255), nullable=False)  # 数据库名称
-    description = Column(Text, nullable=True)  # 描述
-    embed_model = Column(String(255), nullable=True)  # 嵌入模型名称
-    dimension = Column(Integer, nullable=True)  # 向量维度
-    meta_info = Column(JSON, nullable=True)  # 元数据
-    created_at = Column(DateTime, default=func.now())  # 创建时间
-    user_id = Column(String(255), nullable=True, index=True)  # 添加用户ID字段
+    db_id = Column(String(255), nullable=False, unique=True, index=True)  # Database ID
+    name = Column(String(255), nullable=False)  # Database Name
+    description = Column(Text, nullable=True)  # Description
+    embed_model = Column(String(255), nullable=True)  # Embedded Model Name
+    dimension = Column(Integer, nullable=True)  # Vector Dimension
+    meta_info = Column(JSON, nullable=True)  # Metadata
+    created_at = Column(DateTime, default=func.now())  # Created
+    user_id = Column(String(255), nullable=True, index=True)  # Add userID field
 
 
-    # 关系
+    # Relations
     files = relationship("KnowledgeFile", back_populates="database", cascade="all, delete-orphan")
 
     def to_dict(self):
-        """转换为字典格式，确保meta_info映射为metadata"""
+        """Convert to Dictionary Format，Ensuremeta_infoMap tometadata"""
         result = {
             "id": self.id,
             "db_id": self.db_id,
@@ -33,12 +33,12 @@ class KnowledgeDatabase(Base):
             "description": self.description,
             "embed_model": self.embed_model,
             "dimension": self.dimension,
-            "metadata": self.meta_info or {},  # 确保映射正确
+            "metadata": self.meta_info or {},  # Make sure the map is right.
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "user_id": self.user_id
         }
 
-        # 添加文件信息
+        # Add File Information
         if self.files:
             result["files"] = {file.file_id: file.to_dict() for file in self.files}
         else:
@@ -47,24 +47,24 @@ class KnowledgeDatabase(Base):
         return result
 
 class KnowledgeFile(Base):
-    """知识库文件模型"""
+    """Knowledge base file model"""
     __tablename__ = 'knowledge_files'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    file_id = Column(String(255), nullable=False, unique=True, index=True)  # 文件ID，添加唯一约束
-    database_id = Column(String(255), ForeignKey('knowledge_databases.db_id'), nullable=False)  # 所属数据库ID
-    filename = Column(String(255), nullable=False)  # 文件名
-    path = Column(String(1024), nullable=False)  # 文件路径
-    file_type = Column(String(50), nullable=False)  # 文件类型
-    status = Column(String(50), nullable=False)  # 处理状态
-    created_at = Column(DateTime, default=func.now())  # 创建时间
+    file_id = Column(String(255), nullable=False, unique=True, index=True)  # File ID, add the only limit
+    database_id = Column(String(255), ForeignKey('knowledge_databases.db_id'), nullable=False)  # Other Organiser
+    filename = Column(String(255), nullable=False)  # Filename
+    path = Column(String(1024), nullable=False)  # File Path
+    file_type = Column(String(50), nullable=False)  # File type
+    status = Column(String(50), nullable=False)  # Process Status
+    created_at = Column(DateTime, default=func.now())  # Created
 
-    # 关系
+    # Relations
     database = relationship("KnowledgeDatabase", back_populates="files")
     nodes = relationship("KnowledgeNode", back_populates="file", cascade="all, delete-orphan")
 
     def to_dict(self):
-        """转换为字典格式"""
+        """Convert to Dictionary Format"""
         result = {
             "file_id": self.file_id,
             "database_id": self.database_id,
@@ -75,7 +75,7 @@ class KnowledgeFile(Base):
             "created_at": self.created_at.timestamp() if self.created_at else time.time()
         }
 
-        # 添加节点信息
+        # Add Node Information
         if self.nodes:
             result["nodes"] = [node.to_dict() for node in self.nodes]
         else:
@@ -84,22 +84,22 @@ class KnowledgeFile(Base):
         return result
 
 class KnowledgeNode(Base):
-    """知识块模型"""
+    """Knowledge block model"""
     __tablename__ = 'knowledge_nodes'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    file_id = Column(String(255), ForeignKey('knowledge_files.file_id'), nullable=False)  # 所属文件ID
-    text = Column(Text, nullable=False)  # 文本内容
-    hash = Column(String(255), nullable=True)  # 文本哈希值
-    start_char_idx = Column(Integer, nullable=True)  # 开始字符索引
-    end_char_idx = Column(Integer, nullable=True)  # 结束字符索引
-    meta_info = Column(JSON, nullable=True)  # 元数据
+    file_id = Column(String(255), ForeignKey('knowledge_files.file_id'), nullable=False)  # Relevant file ID
+    text = Column(Text, nullable=False)  # Text Contents
+    hash = Column(String(255), nullable=True)  # Text Hash
+    start_char_idx = Column(Integer, nullable=True)  # Start Character Index
+    end_char_idx = Column(Integer, nullable=True)  # End Character Index
+    meta_info = Column(JSON, nullable=True)  # Metadata
 
-    # 关系
+    # Relations
     file = relationship("KnowledgeFile", back_populates="nodes")
 
     def to_dict(self):
-        """转换为字典格式，确保meta_info映射为metadata"""
+        """Convert to Dictionary Format，Ensuremeta_infoMap tometadata"""
         return {
             "id": self.id,
             "file_id": self.file_id,
@@ -107,5 +107,5 @@ class KnowledgeNode(Base):
             "hash": self.hash,
             "start_char_idx": self.start_char_idx,
             "end_char_idx": self.end_char_idx,
-            "metadata": self.meta_info or {}  # 确保映射正确
+            "metadata": self.meta_info or {}  # Make sure the map is right.
         }

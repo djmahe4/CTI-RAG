@@ -9,7 +9,7 @@ class HistoryManager():
         self.add_system(system_prompt)
 
     def add(self, role, content):
-        # 验证参数
+        # Authentication Parameters
         if not role or not isinstance(role, str) or role.strip() == "":
             logger.error(f"Invalid role: {role}")
             return self.messages
@@ -31,7 +31,7 @@ class HistoryManager():
         if content and content.strip():
             return self.add("system", content)
         else:
-            logger.warning("系统提示词为空，跳过添加")
+            logger.warning("System hint is empty，Skip Add")
             return self.messages
 
     def add_ai(self, content):
@@ -52,18 +52,18 @@ class HistoryManager():
         else:
             history = self.messages[-(2*max_rounds):]
 
-        # 验证并添加新消息
+        # Can not open message
         if msg and isinstance(msg, str) and msg.strip():
             history.append({"role": role, "content": msg})
         else:
             logger.warning(f"Invalid message: {msg}, skipping")
             
-        # 验证所有消息格式
+        # Can not open message
         validated_history = self._validate_messages(history)
         return validated_history
 
     def _validate_messages(self, messages):
-        """验证消息格式，确保每个消息都有role和content字段"""
+        """Can not open message，Make sure everything's there.roleandcontentFields"""
         validated = []
         for i, msg in enumerate(messages):
             if not isinstance(msg, dict):
@@ -78,7 +78,7 @@ class HistoryManager():
                 logger.warning(f"Message {i} missing content field, adding empty content: {msg}")
                 msg["content"] = ""
                 
-            # 确保content是字符串
+            # Make sure it's a string.
             if not isinstance(msg["content"], str):
                 msg["content"] = str(msg["content"])
                 

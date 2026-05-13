@@ -14,18 +14,18 @@ class User(Base):
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String(255), nullable=False)
-    password = Column(String(255), nullable=False)  # 存储哈希后的密码
+    password = Column(String(255), nullable=False)  # Store Hashi password
     role = Column(String(20), default="user")
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=datetime.now)
-    user_id = Column(Integer, nullable=True)  # 可选字段，用于兼容旧系统
+    user_id = Column(Integer, nullable=True)  # Optional fields for compatibility with old systems
     
-    # 添加登录相关字段
+    # Add a login-related field
     login_failed_count = Column(Integer, default=0)
     login_locked_until = Column(DateTime, nullable=True)
     last_login = Column(DateTime, nullable=True)
     
-      # 添加这一行，定义与 OperationLog 的关系
+      # Add this line to define the relationship to OperationLog
     operation_logs = relationship("OperationLog", back_populates="user")
     
     
@@ -55,9 +55,9 @@ class User(Base):
     def increment_failed_login(self):
         self.login_failed_count += 1
         
-        # 设置锁定时间，根据失败次数增加锁定时长
+        # Set lock time to increase lock time by number of failures Long
         if self.login_failed_count >= 5:
-            lock_minutes = min(30, 2 ** (self.login_failed_count - 5))  # 指数增长，最多30分钟
+            lock_minutes = min(30, 2 ** (self.login_failed_count - 5))  # Index growth, 30 minutes maximum
             self.login_locked_until = datetime.now() + timedelta(minutes=lock_minutes)
     
     def reset_failed_login(self):
@@ -66,7 +66,7 @@ class User(Base):
 
 
 class OperationLog(Base):
-    """操作日志模型"""
+    """Operation log model"""
 
     __tablename__ = "operation_logs"
 
@@ -77,7 +77,7 @@ class OperationLog(Base):
     ip_address = Column(String, nullable=True)
     timestamp = Column(DateTime, default=func.now())
 
-    # 关联用户
+    # Associated Users
     user = relationship("User", back_populates="operation_logs")
 
     def to_dict(self):
@@ -92,21 +92,21 @@ class OperationLog(Base):
 
 
 class ChatSession(Base):
-    """聊天会话模型"""
+    """Chat Session Model"""
     
     __tablename__ = "chat_sessions"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String(36), unique=True, nullable=False, index=True)  # UUID
     user_id = Column(Integer, nullable=False, index=True)
-    title = Column(String(50), nullable=True)  # 会话标题（最大50字符）
-    system_prompt = Column(Text, nullable=True)  # 系统提示词
+    title = Column(String(50), nullable=True)  # Session Title (maximum 50 characters)
+    system_prompt = Column(Text, nullable=True)  # System Hint
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
-    is_deleted = Column(Integer, default=0)  # 软删除标记
+    is_deleted = Column(Integer, default=0)  # Soft Delete Tags
     
-    # 关联消息
-    # 注意：user_id 不再是外键，而是直接使用 users.user_id 字段
+    # Association Message
+    # Note: user id is no longer a external key but directly uses user.user id fields
     messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
     
     def to_dict(self, include_messages=False):
@@ -126,7 +126,7 @@ class ChatSession(Base):
 
 
 class ChatMessage(Base):
-    """聊天消息模型"""
+    """Chat Message Model"""
     
     __tablename__ = "chat_messages"
     
@@ -135,12 +135,12 @@ class ChatMessage(Base):
     role = Column(String(20), nullable=False)  # user, assistant, system
     content = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
-    is_deleted = Column(Integer, default=0)  # 软删除标记
+    is_deleted = Column(Integer, default=0)  # Soft Delete Tags
     
-    # 扩展字段
-    meta = Column(Text, nullable=True)  # JSON格式存储额外元数据
+    # Expand Fields
+    meta = Column(Text, nullable=True)  # Additional metadata stored in JSON format
     
-    # 关联会话
+    # Association Session
     session = relationship("ChatSession", back_populates="messages")
     
     def to_dict(self):

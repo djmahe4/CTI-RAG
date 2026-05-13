@@ -5,7 +5,7 @@ from datetime import datetime
 
 
 DATETIME = datetime.now().strftime('%Y-%m-%d-%H%M%S')
-# DATETIME = "debug" # 为了方便，调试的时候输出到 debug.log 文件
+# DATETIME = "debug" # For convenience, output to debug.log during debugging
 LOG_FILE = f'saves/log/project-{DATETIME}.log'
 
 def setup_logger(name, level=logging.DEBUG, console=True):
@@ -15,7 +15,7 @@ def setup_logger(name, level=logging.DEBUG, console=True):
     logger = logging.getLogger(name)
     logger.setLevel(level)
 
-    # 清除已有的 Handler，防止重复添加
+    # Clear existing handlers to prevent duplicate addition
     if logger.hasHandlers():
         logger.handlers.clear()
 
@@ -30,14 +30,14 @@ def setup_logger(name, level=logging.DEBUG, console=True):
 
     # Console handler for logging to the console (optional)
     if console:
-        # 为Windows控制台创建安全的日志处理器
+        # Create a safe log handler for the Windows console
         if sys.platform == "win32":
-            # 创建一个自定义的StreamHandler来处理编码问题
+            # Create a custom StreamHandler to handle encoding issues
             console_handler = SafeConsoleHandler()
         else:
             console_handler = logging.StreamHandler()
             
-        # 控制台输出级别设为INFO，减少输出量
+        # Set console output level to INFO to reduce output volume
         console_handler.setLevel(logging.INFO)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
@@ -46,15 +46,15 @@ def setup_logger(name, level=logging.DEBUG, console=True):
 
 
 class SafeConsoleHandler(logging.StreamHandler):
-    """安全的控制台处理器，处理Unicode编码问题"""
+    """Safe console handler to address Unicode encoding issues"""
     
     def emit(self, record):
         try:
             msg = self.format(record)
             stream = self.stream
-            # 在Windows上安全地写入，避免Unicode错误
+            # Securely write on Windows to avoid Unicode errors
             if hasattr(stream, 'encoding') and stream.encoding:
-                # 使用控制台的编码，如果无法编码则忽略错误字符
+                # Use console encoding; replace characters if encoding fails
                 msg = msg.encode(stream.encoding, errors='replace').decode(stream.encoding)
             stream.write(msg + self.terminator)
             self.flush()

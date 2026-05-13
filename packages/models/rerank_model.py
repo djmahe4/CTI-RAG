@@ -48,7 +48,7 @@ def sigmoid(x):
     return 1 / (1 + np.exp(-x))
 
 class ZhipuReranker():
-    """智谱AI Reranker - 使用智谱AI的文本重排序API"""
+    """Think.AI Reranker - Use the spectraAIOther OrganiserAPI"""
     def __init__(self, config, **kwargs):
         self.url = "https://open.bigmodel.cn/api/paas/v4/rerank"
         self.model = "rerank"
@@ -59,53 +59,53 @@ class ZhipuReranker():
             "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json"
         }
-        logger.info(f"ZhipuReranker 初始化成功，模型: {self.model}")
+        logger.info(f"ZhipuReranker Initialization succeeded，Model: {self.model}")
 
     def compute_score(self, sentence_pairs, batch_size=256, max_length=4096, normalize=False):
         """
-        计算文档与查询的相关性分数，兼容两种输入格式。
+        Calculates the document 's relevance to queries，Compatible two input formats。
         1. [query, [doc1, doc2, ...]]
         2. [[query, doc1], [query, doc2], ...]
         """
-        # 格式适配
+        # Format Fit
         if (isinstance(sentence_pairs, list) and len(sentence_pairs) > 0 and
                 isinstance(sentence_pairs[0], list) and len(sentence_pairs[0]) == 2):
-            logger.debug(f"ZhipuReranker: 正在适配 list of pairs 输入格式。")
+            logger.debug(f"ZhipuReranker: Fitting list of pairs Input Format。")
             query = sentence_pairs[0][0]
             documents = [pair[1] for pair in sentence_pairs]
         elif (isinstance(sentence_pairs, list) and len(sentence_pairs) == 2 and
                 isinstance(sentence_pairs[0], str) and isinstance(sentence_pairs[1], list)):
-            logger.debug(f"ZhipuReranker: 使用 [query, [documents]] 输入格式。")
+            logger.debug(f"ZhipuReranker: Use [query, [documents]] Input Format。")
             query, documents = sentence_pairs
         else:
-            raise ValueError(f"ZhipuReranker 接收到无效的输入格式: {type(sentence_pairs)}")
+            raise ValueError(f"ZhipuReranker Received invalid input format: {type(sentence_pairs)}")
 
-        # 截断过长的文档
+        # Interrupted long documents
         truncated_docs = [doc[:max_length] if len(doc) > max_length else doc for doc in documents]
         
-        # 构建请求payload
+        # Build Request Payload
         payload = {
             "model": self.model,
-            "query": query[:max_length],  # 查询也限制在4096字符
+            "query": query[:max_length],  # The query is also limited to 4096 characters.
             "documents": truncated_docs,
-            "return_documents": False,  # 不返回原始文本，节省带宽
+            "return_documents": False,  # Do not return original text, save bandwidth
         }
         
         try:
-            logger.debug(f"调用智谱AI Rerank API: query='{query[:50]}...', 文档数={len(documents)}")
+            logger.debug(f"Call the brainbook.AI Rerank API: query='{query[:50]}...', Number of documents={len(documents)}")
             response = requests.post(self.url, json=payload, headers=self.headers, timeout=30)
             response.raise_for_status()
             
             response_data = response.json()
-            logger.debug(f"智谱AI Rerank API 响应: {response_data}")
+            logger.debug(f"Think.AI Rerank API Response: {response_data}")
             
             results = response_data.get("results", [])
             
             if not results:
-                logger.warning(f"智谱AI Rerank API 返回空结果")
-                return [0.5] * len(documents)  # 返回默认分数
+                logger.warning(f"Think.AI Rerank API Return empty result")
+                return [0.5] * len(documents)  # Returns default score
             
-            # 按原始索引顺序重建分数列表
+            # Rebuild the fraction list in original index order
             scores = [0.0] * len(documents)
             for result in results:
                 index = result.get("index", 0)
@@ -113,22 +113,22 @@ class ZhipuReranker():
                 if 0 <= index < len(documents):
                     scores[index] = score
             
-            # 归一化（如果需要）
+            # Normalization (if required)
             if normalize:
                 scores = [sigmoid(score) for score in scores]
             
-            logger.info(f"智谱AI Rerank 成功: 处理 {len(documents)} 个文档, 平均分数={sum(scores)/len(scores):.4f}")
+            logger.info(f"Think.AI Rerank Success: Processing {len(documents)} Document, Average score={sum(scores)/len(scores):.4f}")
             return scores
             
         except requests.exceptions.RequestException as e:
-            error_msg = f"智谱AI Rerank API 请求失败: {e}"
+            error_msg = f"Think.AI Rerank API Request Failed: {e}"
             if e.response is not None:
-                error_msg += f", 响应: {e.response.text}"
+                error_msg += f", Response: {e.response.text}"
             logger.error(error_msg)
-            raise RuntimeError(f"智谱AI Rerank API 调用失败: {e}") from e
+            raise RuntimeError(f"Think.AI Rerank API Call Failed: {e}") from e
         except Exception as e:
-            logger.error(f"智谱AI Rerank 处理错误: {e}")
-            raise RuntimeError(f"智谱AI Rerank 处理失败: {e}") from e
+            logger.error(f"Think.AI Rerank Process error: {e}")
+            raise RuntimeError(f"Think.AI Rerank Process failed: {e}") from e
 
 class SiliconFlowReranker():
     def __init__(self, config, **kwargs):
@@ -144,22 +144,22 @@ class SiliconFlowReranker():
 
     def compute_score(self, sentence_pairs, batch_size = 256, max_length = 512, normalize = False):
         """
-        计算文档与查询的相关性分数，兼容两种输入格式。
+        Calculates the document 's relevance to queries，Compatible two input formats。
         1. [query, [doc1, doc2, ...]]
         2. [[query, doc1], [query, doc2], ...]
         """
-        # 格式适配
+        # Format Fit
         if (isinstance(sentence_pairs, list) and len(sentence_pairs) > 0 and
                 isinstance(sentence_pairs[0], list) and len(sentence_pairs[0]) == 2):
-            logger.debug(f"SiliconFlowReranker: 正在适配 list of pairs 输入格式。")
+            logger.debug(f"SiliconFlowReranker: Fitting list of pairs Input Format。")
             query = sentence_pairs[0][0]
             documents = [pair[1] for pair in sentence_pairs]
         elif (isinstance(sentence_pairs, list) and len(sentence_pairs) == 2 and
                 isinstance(sentence_pairs[0], str) and isinstance(sentence_pairs[1], list)):
-            logger.debug(f"SiliconFlowReranker: 使用 [query, [documents]] 输入格式。")
+            logger.debug(f"SiliconFlowReranker: Use [query, [documents]] Input Format。")
             query, documents = sentence_pairs
         else:
-            raise ValueError(f"SiliconFlowReranker 接收到无效的输入格式: {type(sentence_pairs)}")
+            raise ValueError(f"SiliconFlowReranker Received invalid input format: {type(sentence_pairs)}")
 
         payload = self.build_payload(query, documents, max_length)
         response = requests.request("POST", self.url, json=payload, headers=self.headers)

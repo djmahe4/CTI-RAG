@@ -48,19 +48,18 @@ EMBED_MODEL_INFO:
   local/BAAI/bge-m3:
     name: BAAI/bge-m3
     dimension: 1024
-    local_path: /app/models/embedding_model/bge-m3 #也可以在这里配置
-
+    local_path: /app/models/embedding_model/bge-m3 # Can also be configured here
 
 RERANKER_LIST:
 
   local/BAAI/bge-m3:
     name: BAAI/bge-m3
-    local_path: /app/models/embedding_model/bge-m3 #也可以在这里配置
+    local_path: /app/models/embedding_model/bge-m3 # Can also be configured here
 
   zhipu/rerank:
     name: rerank
     url: https://open.bigmodel.cn/api/paas/v4/rerank
-    description: 智谱AI文本重排序模型，支持最多128个文档，单文档最大4096字符
+    description: Zhipu AI text reranking model, supports up to 128 documents, max 4096 characters per document.
 
   # siliconflow/BAAI/bge-reranker-v2-m3:
   #   name: BAAI/bge-reranker-v2-m3

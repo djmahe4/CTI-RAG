@@ -85,7 +85,7 @@ class OpenAIBase():
             return self._get_response(messages)
 
     def _stream_response(self, messages):
-        # 验证消息格式
+        # Can not open message
         if not messages or not isinstance(messages, list):
             raise ValueError("Messages must be a non-empty list")
             
@@ -187,7 +187,7 @@ class OpenModel(OpenAIBase):
         model_name = model_name or "gpt-4o-mini"
         api_key = os.getenv("OPENAI_API_KEY")
         
-        # 强制使用中转站地址
+        # Force stop address
         base_url = "https://jeniya.top/v1"
         logger.info(f"OpenModel is using OpenAI via proxy: {base_url}")
 
@@ -221,7 +221,7 @@ class DeepSeek(OpenAIBase):
 
 
 # class Qianfan(OpenAIBase):
-#     """弃用"""
+# ""Damn."
 
 #     def __init__(self, model_name="ernie_speed") -> None:
 #         import qianfan

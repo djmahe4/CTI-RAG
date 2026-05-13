@@ -12,16 +12,16 @@ from ..plugins import ocr
 
 def chunk(text_or_path, params=None):
     """
-    将文本或文件切分成固定大小的块
+    Split text or file into fixed-size chunks
 
     Args:
-        text_or_path: 文本或文件路径
-        params: 参数
-            chunk_size: 块大小
-            chunk_overlap: 块重叠大小
-            use_parser: 是否使用文件解析器
+        text_or_path: text or file path
+        params: parameters
+            chunk_size: chunk size
+            chunk_overlap: chunk overlap size
+            use_parser: whether to use file parser
     Returns:
-        nodes: 节点列表
+        nodes: list of nodes
     """
     params = params or {}
     chunk_size = int(params.get("chunk_size", 1000))
@@ -31,13 +31,13 @@ def chunk(text_or_path, params=None):
         chunk_overlap=chunk_overlap,
     )
 
-    # 如果文件存在，则使用文件解析器
+    # If file exists, use file parser
     if os.path.isfile(text_or_path) and os.path.exists(text_or_path):
         file_type = Path(text_or_path).suffix.lower()
         logger.info(f"Processing file: {text_or_path}, type: {file_type}")
         
         if file_type == ".pdf":
-            # 对于PDF文件，始终读取正文，多级回退在 read_text 中完成
+            # For PDF files, always read main text; multi-level fallback is handled in read_text
             logger.info(f"Reading PDF file: {text_or_path}")
             text_content = read_text(text_or_path)
             logger.info(f"PDF content length: {len(text_content)}")
@@ -45,7 +45,7 @@ def chunk(text_or_path, params=None):
         elif file_type in [".txt", ".json", ".md"]:
             docs = FlatReader().load_data(Path(text_or_path))
         elif file_type in [".docx"]:
-            # 优先使用 docx2txt 直接提取正文，失败再回退 DocxReader
+            # Prefer using docx2txt to extract text directly, fallback to DocxReader if it fails
             try:
                 import docx2txt  # type: ignore
                 content = docx2txt.process(text_or_path) or ""
@@ -53,7 +53,7 @@ def chunk(text_or_path, params=None):
             except Exception:
                 docs = DocxReader().load_data(Path(text_or_path))
         elif file_type in [".doc", ".csv", ".xlsx", ".xls"]:
-            # 其他常见办公文件，读取为纯文本后再分块
+            # Other common office files, read as plain text before chunking
             try:
                 text_content = read_text(text_or_path)
                 docs = [Document(id_=hashstr(text_or_path), text=text_content)]
@@ -79,19 +79,19 @@ def chunk(text_or_path, params=None):
 
 
 def pdfreader(file_path):
-    """读取PDF文件并返回text文本"""
+    """Read PDF file and return text content"""
     assert os.path.exists(file_path), "File not found"
     assert file_path.endswith(".pdf"), "File format not supported"
 
     from llama_index.readers.file import PDFReader
     doc = PDFReader().load_data(file=Path(file_path))
 
-    # 简单的拼接起来之后返回纯文本
+    # Simply join and return plain text
     text = "\n\n".join([d.get_content() for d in doc])
     return text
 
 def plainreader(file_path):
-    """读取普通文本文件并返回text文本"""
+    """Read plain text file and return text content"""
     assert os.path.exists(file_path), "File not found"
 
     with open(file_path, "r") as f:
@@ -108,13 +108,13 @@ def read_text(file, params=None):
         raise NotImplementedError("Directory not supported now!")
 
     if file.endswith(".pdf"):
-        # 多级回退：PDFReader -> PyMuPDF(get_text) -> RapidOCR
-        # 1) 结构化文本 PDFReader
+        # Multi-level fallback: PDFReader -> PyMuPDF(get_text) -> RapidOCR
+        # 1) Structured text PDFReader
         try:
             return pdfreader(file)
         except Exception as e:
             logger.warning(f"pdfreader failed: {e}")
-        # 2) 直接用 PyMuPDF 提取文本
+        # 2) Directly use PyMuPDF to extract text
         try:
             import fitz  # PyMuPDF
             doc = fitz.open(file)
@@ -127,7 +127,7 @@ def read_text(file, params=None):
                 return text
         except Exception as e:
             logger.warning(f"PyMuPDF get_text failed: {e}")
-        # 3) RapidOCR 图像型 PDF
+        # 3) RapidOCR for image-based PDF
         return ocr.process_pdf(file)
 
     elif file.endswith(".txt") or file.endswith(".md"):
@@ -148,22 +148,22 @@ def read_text(file, params=None):
 
 
 def csvreader(file_path):
-    """读取CSV并拼接为纯文本"""
+    """Read CSV and join as plain text"""
     import pandas as pd
     try:
         df = pd.read_csv(file_path, dtype=str, keep_default_na=False, encoding="utf-8")
     except Exception:
-        # 回退常见编码
+        # Fallback to common encodings
         df = pd.read_csv(file_path, dtype=str, keep_default_na=False, encoding_errors="ignore")
-    # 每行拼成一段
+    # Join each row into a paragraph
     lines = df.astype(str).apply(lambda r: " \t ".join(r.values.tolist()), axis=1).tolist()
     return "\n".join(lines)
 
 
 def excelreader(file_path):
-    """读取Excel（xlsx/xls）并拼接为纯文本（按工作表顺序）"""
+    """Read Excel (xlsx/xls) and join as plain text (by sheet order)"""
     import pandas as pd
-    # 读取所有工作表
+    # Read all sheets
     xls = pd.read_excel(file_path, sheet_name=None, dtype=str)
     texts = []
     for sheet_name, df in xls.items():
@@ -176,8 +176,8 @@ def excelreader(file_path):
 
 
 def docreader(file_path):
-    """尝试读取旧版Word .doc 文本。
-    优先使用 textract，其次尝试 antiword；若均不可用则抛错提示安装依赖。
+    """Try to read legacy Word .doc text.
+    Prioritize textract, then antiword; raise error if neither is available.
     """
     try:
         import textract  # type: ignore
@@ -194,5 +194,5 @@ def docreader(file_path):
                 return res.stdout.decode("utf-8", errors="ignore")
             else:
                 raise Exception(f"antiword failed: {res.stderr.decode('utf-8', errors='ignore')}")
-        raise Exception(".doc 解析需要依赖 textract 或 antiword，请在镜像中安装后重试")
+        raise Exception(".doc parsing requires textract or antiword, please install dependencies and retry")
 
