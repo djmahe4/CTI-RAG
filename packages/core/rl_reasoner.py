@@ -1,7 +1,7 @@
-"""基于强化学习的图推理器
+"""Graphical declerator based on enhanced learning
 
-该模块封装了策略网络与图谱环境，提供从自然语言查询到候选路径
-的推理能力，供新 API 使用。
+The module contains a policy network and spectro environment，Provides a path from natural language query to candidate
+The ability to reason.，For New API Use。
 """
 
 from __future__ import annotations
@@ -25,7 +25,7 @@ try:
     from RL.policy_network import GraphReasoningPolicy
     from RL.graph_env import GraphReasoningEnv
 except Exception as exc:  # noqa: B902
-    logger.error(f"导入 RL 组件失败: {exc}")
+    logger.error(f"Import RL Component failed: {exc}")
     raise
 
 
@@ -41,14 +41,14 @@ class RLPathResult:
 
 
 class RLGraphReasoner:
-    """强化学习图推理器"""
+    """Enhanced Learning Chart Decoder"""
 
     def __init__(self) -> None:
         self.project_root = get_project_root()
         self.device = config.get("rl_device", "cuda")
         if self.device == "cuda" and not torch.cuda.is_available():
             raise RuntimeError(
-                "RL 推理配置为使用 CUDA，但当前环境未检测到可用 GPU。"
+                "RL Logo Configuration to Use CUDA，But the current environment is not detectable. GPU。"
             )
 
         self.base_model_path = self._resolve_path(config.get("rl_base_model_path"))
@@ -85,12 +85,12 @@ class RLGraphReasoner:
             return
 
         if not self.base_model_path or not os.path.exists(self.base_model_path):
-            raise RuntimeError(f"RL 基础模型路径不存在: {self.base_model_path}")
+            raise RuntimeError(f"RL Basic model path does not exist: {self.base_model_path}")
         if not self.policy_checkpoint or not os.path.exists(self.policy_checkpoint):
-            raise RuntimeError(f"RL 策略权重不存在: {self.policy_checkpoint}")
+            raise RuntimeError(f"RL Strategic weight does not exist: {self.policy_checkpoint}")
 
         logger.info(
-            f"初始化 RL 策略网络: base={self.base_model_path}, lora={self.lora_path}, device={self.device}"
+            f"Initialize RL Policy Network: base={self.base_model_path}, lora={self.lora_path}, device={self.device}"
         )
 
         self.policy = GraphReasoningPolicy(
@@ -104,9 +104,9 @@ class RLGraphReasoner:
             self.policy.load(self.policy_checkpoint)
             self.policy.eval()
             self.policy_loaded = True
-            logger.info("RL 策略权重加载完成")
+            logger.info("RL Strategy weight load complete")
         except Exception as exc:  # noqa: B902
-            logger.error(f"加载 RL 策略权重失败: {exc}, {traceback.format_exc()}")
+            logger.error(f"Load RL Strategy weight failed: {exc}, {traceback.format_exc()}")
             raise
 
     def _create_env(self) -> GraphReasoningEnv:
@@ -186,7 +186,7 @@ class RLGraphReasoner:
         top_k = top_k or self.candidate_top_k
         candidates, query_vector = self.candidate_index.search(query, top_k=top_k)
         if not candidates:
-            logger.warning(f"RL 推理未找到候选起始实体: {query}")
+            logger.warning(f"RL The reasoning does not identify the candidate starting entity: {query}")
             return []
 
         query_embedding = None
@@ -229,7 +229,7 @@ class RLGraphReasoner:
                     )
                 except Exception as exc:  # noqa: B902
                     logger.error(
-                        f"RL 推理失败: start_entity={start_entity}, {exc}, {traceback.format_exc()}"
+                        f"RL Logical failure: start_entity={start_entity}, {exc}, {traceback.format_exc()}"
                     )
                     continue
 
@@ -273,7 +273,7 @@ class RLGraphReasoner:
                         path_vec = path_vec / norm
                         similarity = float(np.dot(query_embedding, path_vec))
                 except Exception as exc:  # noqa: B902
-                    logger.debug(f"路径相似度计算失败: {exc}")
+                    logger.debug(f"Path similarity calculation failed: {exc}")
 
             enriched = dict(item)
             enriched["similarity"] = similarity

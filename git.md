@@ -1,40 +1,68 @@
+# Git Workflow Guide
 
-# 新建分支并推送
+## 🌿 Creating and Pushing a New Branch
 
-## 1. 创建新分支并切换到该分支
+### 1. Create and Switch to a New Branch
+```bash
 git checkout -b <new-branch-name>
+```
 
-## 2. 在新分支上进行修改
-## ... 编辑文件 ...
+### 2. Implement Changes
+*Edit, add, or refactor your code as needed.*
 
-## 3. 添加并提交更改
+### 3. Stage and Commit Changes
+```bash
 git add .
-git commit -m "描述你的更改"
+git commit -m "Detailed description of your changes"
+```
 
-## 4. 推送新分支到远程仓库
+### 4. Push Branch to Remote Repository
+```bash
+# Sets upstream tracking automatically
 git push -u origin <new-branch-name>
+```
 
+---
 
-#  合并分支
-## 1. 拉取远程分支
+## 🔀 Merging Branches
+
+### 1. Fetch Remote Updates
+```bash
 git fetch origin <branch-name>
+```
 
-## 2. 切换到该分支
+### 2. Switch to the Target Branch
+```bash
 git checkout <branch-name>
+```
 
-## 3. 查看分支状态和提交历史
+### 3. Verify Status and History
+```bash
 git status
 git log --oneline --graph --decorate
+```
 
-## 4. 切换回主分支准备合并
+### 4. Prepare Main Branch for Merge
+```bash
 git checkout master
+```
 
-## 5. 查看两个分支的差异
+### 5. Review Differences
+```bash
+# View unique commits on the feature branch
 git log master..<branch-name> --oneline
+
+# View code-level differences
 git diff master..<branch-name>
+```
 
-## 6. 如果决定合并，执行合并操作
+### 6. Execute Merge
+```bash
 git merge <branch-name>
+```
 
-## 7. 合并后可以删除已合并的分支（可选）
+### 7. Clean Up (Optional)
+```bash
+# Delete the local feature branch after a successful merge
 git branch -d <branch-name>
+```

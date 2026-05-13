@@ -2,14 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from rag.api.routers import router
 
-# 导入路由  # 这一行很重要
+# Import route # This line is important
 fastapi_server = FastAPI()
 fastapi_server.include_router(router)
 
-# 配置CORS
+# Configure CORS
 fastapi_server.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 明确指定允许的前端源
+    allow_origins=["*"],  # Specify explicitly the allowed front-end source
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,7 +25,7 @@ async def add_security_headers(request, call_next):
     response.headers["Permissions-Policy"] = "accelerometer=(), camera=(), microphone=(), geolocation=()"
     return response
 
-# 添加路由
+# Add route
 
 @fastapi_server.get("/")
 async def root():

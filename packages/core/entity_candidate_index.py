@@ -1,6 +1,6 @@
-"""实体候选索引
+"""Entity Candidate Index
 
-提供查询到起始实体的快速检索能力，供 RL 图推理服务使用。
+Provide quick search capability to start entities for queries，For RL Use of graphic reasoning services。
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ DEFAULT_CACHE_RELATIVE_PATH = os.path.join("RL", "cache", "entity_candidates.jso
 
 
 class EntityCandidateIndex:
-    """实体候选索引器"""
+    """Entity Candidate Indexer"""
 
     def __init__(self, cache_path: Optional[str] = None) -> None:
         self.cache_path = cache_path
@@ -57,7 +57,7 @@ class EntityCandidateIndex:
             with open(path, "r", encoding="utf-8") as f:
                 payload = json.load(f)
         except Exception as exc:  # noqa: B902
-            logger.error(f"加载实体候选缓存失败: {path}, {exc}")
+            logger.error(f"Failed to load entity cache: {path}, {exc}")
             self.items = []
             self.token_index = {}
             self.item_map = {}
@@ -85,11 +85,11 @@ class EntityCandidateIndex:
             self.embedding_matrix = None
 
         logger.info(
-            f"实体候选缓存加载完成: {path}, 共 {len(self.items)} 条记录"
+            f"Entity Cache Load complete: {path}, Total {len(self.items)} Notes"
         )
 
     def reload(self) -> None:
-        """重新加载缓存文件"""
+        """Reload Cache File"""
 
         self._load()
 
@@ -114,9 +114,9 @@ class EntityCandidateIndex:
 
         try:
             self._embedding_model = EmbeddingModel(model_path=model_path, device=device)
-            logger.info(f"实体索引: 已加载向量模型 {model_path} (device={device})")
+            logger.info(f"Entity Index: Loaded vector model {model_path} (device={device})")
         except Exception as exc:  # noqa: B902
-            logger.error(f"实体索引加载向量模型失败: {exc}")
+            logger.error(f"Entity Index Loading Vector Model failed: {exc}")
             self._embedding_model = None
 
         return self._embedding_model
@@ -146,7 +146,7 @@ class EntityCandidateIndex:
         top_k: int = 5,
         min_score: float = 0.5,
     ) -> Tuple[List[Dict[str, Any]], Optional[List[float]]]:
-        """根据查询文本返回匹配的实体候选"""
+        """Returns a matching entity candidate based on query text"""
 
         if not query or not self.items:
             return [], None
@@ -176,9 +176,9 @@ class EntityCandidateIndex:
                     if results:
                         return results, query_vec.tolist()
                 except Exception as exc:  # noqa: B902
-                    logger.error(f"实体 embedding 匹配失败: {exc}")
+                    logger.error(f"Entities embedding Match Failed: {exc}")
 
-        # fallback: token +关键词匹配
+        # fallback: token + keyword match
         tokens = generate_candidate_tokens(query)
         candidate_scores: Dict[str, float] = {}
 
@@ -212,7 +212,7 @@ class EntityCandidateIndex:
         return results, None
 
 
-# 单例索引（避免在 API 层重复加载大文件）
+# Individual Index (avoiding the reloading of large files on API)
 _cached_index: Optional[EntityCandidateIndex] = None
 
 

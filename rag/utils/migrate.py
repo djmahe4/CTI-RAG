@@ -1,5 +1,5 @@
 """
-数据库迁移系统
+Database migration system
 """
 
 import os
@@ -12,7 +12,7 @@ from src.utils import logger
 
 
 class DatabaseMigrator:
-    """数据库迁移器"""
+    """Database Migration"""
 
     def __init__(self, db_path: str):
         self.db_path = db_path
@@ -20,13 +20,13 @@ class DatabaseMigrator:
         self.migration_version_key = "migration_version"
 
     def ensure_backup_dir(self):
-        """确保备份目录存在"""
+        """Ensure that a backup directory exists"""
         Path(self.backup_dir).mkdir(parents=True, exist_ok=True)
 
     def backup_database(self) -> str:
-        """备份数据库文件"""
+        """Backup database files"""
         if not os.path.exists(self.db_path):
-            logger.info("数据库文件不存在，无需备份")
+            logger.info("Database file does not exist，No backup required")
             return ""
 
         self.ensure_backup_dir()
@@ -36,14 +36,14 @@ class DatabaseMigrator:
 
         try:
             shutil.copy2(self.db_path, backup_path)
-            logger.info(f"数据库已备份到: {backup_path}")
+            logger.info(f"Database backuped to: {backup_path}")
             return backup_path
         except Exception as e:
-            logger.error(f"数据库备份失败: {e}")
+            logger.error(f"Database backup failed: {e}")
             raise
 
     def get_current_version(self) -> int:
-        """获取当前数据库版本"""
+        """Get the current database version"""
         if not os.path.exists(self.db_path):
             return 0
 
@@ -51,43 +51,43 @@ class DatabaseMigrator:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # 检查版本表是否存在
+            # Check if the version table exists
             cursor.execute("""
                                    SELECT name FROM sqlite_master
                                    WHERE type='table' AND name='migration_versions'            """)
 
             if not cursor.fetchone():
-                # 版本表不存在，检查是否为旧版本数据库
+                # Version table does not exist, check if old version data Library
                 cursor.execute("""
                     SELECT name FROM sqlite_master
                     WHERE type='table' AND name='users'
                 """)
                 if cursor.fetchone():
-                    # 用户表存在但版本表不存在，说明是旧版本
+                    # User table exists but the version table does not exist, indicating that it is an old version
                     return 0
                 else:
-                    # 全新数据库
+                    # New database
                     return 0
 
-            # 获取当前版本
+            # Get Current Version
             cursor.execute("SELECT version FROM migration_versions ORDER BY version DESC LIMIT 1")
             result = cursor.fetchone()
             return result[0] if result else 0
 
         except Exception as e:
-            logger.error(f"获取数据库版本失败: {e}")
+            logger.error(f"Failed to get database version: {e}")
             return 0
         finally:
             if "conn" in locals():
                 conn.close()
 
     def set_version(self, version: int):
-        """设置数据库版本"""
+        """Setup Database Version"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # 创建版本表
+            # Create Version Table
             cursor.execute("""
                 CREATE TABLE IF NOT EXISTS migration_versions (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -97,7 +97,7 @@ class DatabaseMigrator:
                 )
             """)
 
-            # 插入版本记录
+            # Insert Version Record
             cursor.execute(
                 """
                 INSERT INTO migration_versions (version, description)
@@ -107,41 +107,41 @@ class DatabaseMigrator:
             )
 
             conn.commit()
-            logger.info(f"数据库版本设置为: {version}")
+            logger.info(f"Database version set to: {version}")
 
         except Exception as e:
-            logger.error(f"设置数据库版本失败: {e}")
+            logger.error(f"Failed to set database version: {e}")
             raise
         finally:
             if "conn" in locals():
                 conn.close()
 
     def execute_migration(self, version: int, description: str, sql_commands: list[str]):
-        """执行迁移"""
-        logger.info(f"执行迁移 v{version}: {description}")
+        """Execute Migration"""
+        logger.info(f"Execute Migration v{version}: {description}")
 
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
 
-            # 执行迁移SQL命令
+            # Execute the SQL relocation order
             for sql in sql_commands:
-                if sql.strip():  # 跳过空命令
-                    logger.info(f"执行SQL: {sql}")
+                if sql.strip():  # Skip empty commands
+                    logger.info(f"ImplementationSQL: {sql}")
                     cursor.execute(sql)
 
             conn.commit()
-            logger.info(f"迁移 v{version} 执行成功")
+            logger.info(f"Migration v{version} Implementation Success")
 
         except Exception as e:
-            logger.error(f"迁移 v{version} 执行失败: {e}")
+            logger.error(f"Migration v{version} Implementation Failed: {e}")
             raise
         finally:
             if "conn" in locals():
                 conn.close()
 
     def check_column_exists(self, table_name: str, column_name: str) -> bool:
-        """检查列是否存在"""
+        """Check column for presence"""
         try:
             conn = sqlite3.connect(self.db_path)
             cursor = conn.cursor()
@@ -157,100 +157,100 @@ class DatabaseMigrator:
                 conn.close()
 
     def run_migrations(self):
-        """运行所有待执行的迁移"""
+        """Run all pending migrations"""
         current_version = self.get_current_version()
         latest_version = self.get_latest_migration_version()
 
-        # 如果数据库已存在但没有版本表，创建版本表并设置为最新版本
+        # Create a version table and set it to the latest if the database already exists without a version table
         if current_version == 0 and latest_version > 0 and os.path.exists(self.db_path):
-            # 检查users表是否已有新字段，如果有，说明是通过SQLAlchemy创建的
+            # Check if there are new fields in the user table, if any, indicating that they were created through SQLAlchemy
             if (
                 self.check_column_exists("users", "login_failed_count")
                 and self.check_column_exists("users", "last_failed_login")
                 and self.check_column_exists("users", "login_locked_until")
             ):
-                # 字段已存在，直接设置为最新版本
-                logger.info(f"检测到现有数据库已包含最新字段，设置版本为 v{latest_version}")
+                # Field already exists, set directly to the latest version
+                logger.info(f"Detects that the existing database contains the latest fields，Set Version As v{latest_version}")
                 self.set_version(latest_version)
                 return
 
         if current_version >= latest_version:
-            logger.info(f"数据库已是最新版本 v{current_version}")
+            logger.info(f"Database is the latest version v{current_version}")
             return
 
-        logger.info(f"开始数据库迁移: v{current_version} -> v{latest_version}")
+        logger.info(f"Start database migration: v{current_version} -> v{latest_version}")
 
-        # 备份数据库
+        # Backup Database
         backup_path = self.backup_database()
 
         try:
-            # 执行迁移
+            # Execute Migration
             migrations = self.get_migrations()
             has_executed_migrations = False
 
             for version, description, sql_commands in migrations:
                 if version > current_version:
-                    if sql_commands:  # 只有当有SQL命令时才执行迁移
+                    if sql_commands:  # Relocation only when SQL commands
                         self.execute_migration(version, description, sql_commands)
                         has_executed_migrations = True
                     else:
-                        logger.info(f"迁移 v{version}: {description} - 无需执行，字段已存在")
+                        logger.info(f"Migration v{version}: {description} - No implementation required，Field already exists")
 
-                    # 无论是否有SQL命令，都设置版本
+                    # Set version with or without SQL commands
                     self.set_version(version)
 
             if has_executed_migrations:
-                logger.info("数据库迁移完成")
+                logger.info("Database migration complete")
             else:
-                logger.info("数据库结构已是最新，仅更新版本记录")
+                logger.info("Database structure is up to date，Update only version records")
 
         except Exception as e:
-            logger.error(f"数据库迁移失败: {e}")
+            logger.error(f"Database migration failed: {e}")
             if backup_path and os.path.exists(backup_path):
-                logger.info(f"尝试从备份恢复: {backup_path}")
+                logger.info(f"Try to recover from backup: {backup_path}")
                 try:
                     shutil.copy2(backup_path, self.db_path)
-                    logger.info("数据库已从备份恢复")
+                    logger.info("Database restored from backup")
                 except Exception as restore_error:
-                    logger.error(f"数据库恢复失败: {restore_error}")
+                    logger.error(f"Database restoration failed: {restore_error}")
             raise
 
     def get_latest_migration_version(self) -> int:
-        """获取最新迁移版本号"""
-        # 这里返回硬编码的最新版本号，不依赖迁移定义
-        # 因为迁移定义可能为空（字段已存在）
-        return 1  # 当前最新版本是 v1
+        """Get the latest migration number"""
+        # Returns the latest version of the hard code here, without depending on the migration definition
+        # Because the migration definition may be empty (field already exists)
+        return 1  # Current latest version is v1
 
     def get_migrations(self) -> list[tuple[int, str, list[str]]]:
-        """获取所有迁移定义
-        返回格式: [(version, description, [sql_commands])]
+        """Get All Migration Definitions
+        Return Format: [(version, description, [sql_commands])]
         """
         migrations = []
 
-        # 迁移 v1: 为 users 表添加登录失败限制字段
-        # 使用条件检查来避免重复添加字段
+        # Move v1: Add login limit field to user table
+        # Use condition check to avoid adding fields
         v1_commands = []
 
-        # 检查并添加 login_failed_count 字段
+        # Check and add login failed count field
         if not self.check_column_exists("users", "login_failed_count"):
             v1_commands.append("ALTER TABLE users ADD COLUMN login_failed_count INTEGER NOT NULL DEFAULT 0")
 
-        # 检查并添加 last_failed_login 字段
+        # Check and add last failed login fields
         if not self.check_column_exists("users", "last_failed_login"):
             v1_commands.append("ALTER TABLE users ADD COLUMN last_failed_login DATETIME")
 
-        # 检查并添加 login_locked_until 字段
+        # Check and add login locked until field
         if not self.check_column_exists("users", "login_locked_until"):
             v1_commands.append("ALTER TABLE users ADD COLUMN login_locked_until DATETIME")
 
-        # 如果有命令需要执行，才添加迁移
+        # If there's an order to execute, add migration
         if v1_commands:
-            migrations.append((1, "为用户表添加登录失败限制字段", v1_commands))
+            migrations.append((1, "Could not close temporary folder: %s", v1_commands))
 
-        # 未来的迁移可以在这里添加
+        # Future migration can be added here
         # migrations.append((
         #     2,
-        #     "添加新功能相关表",
+        # "Add a new functionality-related table,"
         #     [
         #         "CREATE TABLE new_feature (...)",
         #         "ALTER TABLE existing_table ADD COLUMN new_field ..."
@@ -261,13 +261,13 @@ class DatabaseMigrator:
 
 
 def validate_database_schema(db_path: str) -> tuple[bool, list[str]]:
-    """验证数据库结构是否符合当前模型
+    """Verify database structure for current model
 
     Returns:
-        tuple: (是否符合, 缺失的字段列表)
+        tuple: (Compatibility, List of missing fields)
     """
     if not os.path.exists(db_path):
-        return False, ["数据库文件不存在"]
+        return False, ["Database file does not exist"]
 
     missing_fields = []
 
@@ -275,7 +275,7 @@ def validate_database_schema(db_path: str) -> tuple[bool, list[str]]:
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
 
-        # 检查users表必需字段
+        # Check the required fields of the user table
         required_fields = {
             "users": [
                 "id",
@@ -295,7 +295,7 @@ def validate_database_schema(db_path: str) -> tuple[bool, list[str]]:
         }
 
         for table_name, fields in required_fields.items():
-            # 检查表是否存在
+            # Checklist exists
             cursor.execute(
                 """
                 SELECT name FROM sqlite_master
@@ -305,39 +305,39 @@ def validate_database_schema(db_path: str) -> tuple[bool, list[str]]:
             )
 
             if not cursor.fetchone():
-                missing_fields.append(f"表 {table_name} 不存在")
+                missing_fields.append(f"Table {table_name} does not exist")
                 continue
 
-            # 检查字段是否存在
+            # Checks if fields exist
             cursor.execute(f"PRAGMA table_info({table_name})")
             existing_columns = [column[1] for column in cursor.fetchall()]
 
             for field in fields:
                 if field not in existing_columns:
-                    missing_fields.append(f"表 {table_name} 缺少字段 {field}")
+                    missing_fields.append(f"Table {table_name} Missing fields {field}")
 
         return len(missing_fields) == 0, missing_fields
 
     except Exception as e:
-        logger.error(f"验证数据库结构失败: {e}")
-        return False, [f"验证失败: {str(e)}"]
+        logger.error(f"Failed to validate database structure: {e}")
+        return False, [f"Authentication Failed: {str(e)}"]
     finally:
         if "conn" in locals():
             conn.close()
 
 
 def check_and_migrate(db_path: str):
-    """检查并执行数据库迁移"""
-    # 先验证数据库结构
+    """Check and execute database migration"""
+    # Validate database structure first
     is_valid, issues = validate_database_schema(db_path)
 
     if not is_valid:
-        logger.warning("数据库结构不符合当前设计:")
+        logger.warning("Database structure does not match current design:")
         for issue in issues:
             logger.warning(f"  - {issue}")
 
         if os.path.exists(db_path):
-            logger.info("建议运行迁移脚本: docker exec api-dev python /app/scripts/migrate_user_fields.py")
+            logger.info("Recommended to run the migration script: docker exec api-dev python /app/scripts/migrate_user_fields.py")
 
     migrator = DatabaseMigrator(db_path)
 
@@ -345,5 +345,5 @@ def check_and_migrate(db_path: str):
         migrator.run_migrations()
         return True
     except Exception as e:
-        logger.error(f"数据库迁移过程中发生错误: {e}")
+        logger.error(f"Error during database migration: {e}")
         return False

@@ -13,14 +13,14 @@ MYSQL_HOST = "mysql"
 
 
 class KBDBManager:
-    """知识库数据库管理器"""
+    """Knowledge base database manager"""
 
     def __init__(self):
         self.db_path = os.path.join(config.save_dir, "data", "knowledge.db")
         self.ensure_db_dir()
 
-        # 创建SQLAlchemy引擎
-        # 优先读取环境变量，其次读取配置文件，最后采用容器内合理默认值
+        # Create SQLAlchemy Engine
+        # Prioritize reading of environmental variables, followed by reading of profiles, and finally using reasonable defaults in containers
         mysql_host = os.getenv("MYSQL_HOST", config.get(
             "mysql", {}).get("host", "mysql"))
         mysql_port = int(
@@ -32,7 +32,7 @@ class KBDBManager:
         mysql_db = os.getenv("MYSQL_DB", config.get(
             "mysql", {}).get("database", "knowledge_db"))
 
-        # 构建连接字符串
+        # Build Connection String
         db_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_db}"
         self.engine = create_engine(
             db_url,
@@ -40,82 +40,82 @@ class KBDBManager:
             pool_recycle=1800,
         )
 
-        # 创建会话工厂
+        # Create Session Factory
         self.Session = sessionmaker(bind=self.engine)
 
-        # 确保表存在
+        # Make sure the watch exists
         self.create_tables()
 
     def ensure_db_dir(self):
-        """确保数据库目录存在"""
+        """Ensure database directory exists"""
         db_dir = os.path.dirname(self.db_path)
         pathlib.Path(db_dir).mkdir(parents=True, exist_ok=True)
 
     def create_tables(self):
-        """创建数据库表"""
+        """Create database table"""
         Base.metadata.create_all(self.engine)
 
     @contextmanager
     def get_session(self):
-        """获取数据库会话的上下文管理器"""
+        """Context manager for accessing database sessions"""
         session = self.Session()
         try:
             yield session
             session.commit()
         except Exception as e:
             session.rollback()
-            logger.error(f"数据库操作失败: {e}")
+            logger.error(f"Database operation failed: {e}")
             raise
         finally:
             session.close()
 
     def _detach_safely(self, obj):
-        """安全地分离对象，确保属性已加载"""
+        """Safe separation of objects，Ensure attribute loaded"""
         if obj is None:
             return None
 
-        # 确保主键已加载
+        # Ensure primary key loaded
         if hasattr(obj, 'id'):
             _ = obj.id
         if hasattr(obj, 'db_id'):
             _ = obj.db_id
 
-        # 根据需要添加其他必须预加载的属性
+        # Add other properties that must be preloaded as necessary
 
         return obj
 
-    # 知识库操作方法
+    # Knowledge base operating methods
     def get_all_databases(self):
-        """获取所有知识库"""
+        """Access to all knowledge bases"""
         with self.get_session() as session:
-            # 使用eager loading加载关联的files
+            # Load associated files with eager load
             databases = session.query(KnowledgeDatabase).options(
                 joinedload(KnowledgeDatabase.files)
             ).all()
 
-            # 转换为字典并返回，避免后续延迟加载
+            # Convert to dictionary and return without subsequent delay Load
             return [self._to_dict_safely(db) for db in databases]
 
     def get_database_by_id(self, db_id):
-        """根据ID获取知识库"""
+        """Based onIDAccess to the knowledge base"""
         with self.get_session() as session:
-            # 使用eager loading加载关联的files
+            # Load associated files with eager load
             db = session.query(KnowledgeDatabase).options(
                 joinedload(KnowledgeDatabase.files).joinedload(
                     KnowledgeFile.nodes)
             ).filter_by(db_id=db_id).first()
 
-            # 转换为字典并返回，避免后续延迟加载
+            # Convert to dictionary and return without subsequent delay Load
             return self._to_dict_safely(db) if db else None
 
     def _to_dict_safely(self, obj):
-        """安全地将对象转换为字典，避免延迟加载问题"""
+        """Convert objects safely into dictionaries，Avoiding delay loading problems"""
         if hasattr(obj, 'to_dict'):
             return obj.to_dict()
         return obj
 
     def create_database(self, db_id, name, description, embed_model=None, dimension=None, metadata=None, user_id=None):
-        """创建知识库"""
+        """Create a knowledge base"""
         with self.get_session() as session:
             db = KnowledgeDatabase(
                 db_id=db_id,
@@ -123,27 +123,27 @@ class KBDBManager:
                 description=description,
                 embed_model=embed_model,
                 dimension=dimension,
-                meta_info=metadata or {},  # 存储到meta_info字段
+                meta_info=metadata or {},  # Store to Meta info field
                 user_id=user_id
             )
             session.add(db)
-            session.flush()  # 立即写入数据库，获取ID
+            session.flush()  # Write to database immediately and get ID
 
-            # 手动将必要的数据加载到内存中
+            # Manually load necessary data into memory Medium
             db_dict = {
                 "db_id": db_id,
                 "name": name,
                 "description": description,
                 "embed_model": embed_model,
                 "dimension": dimension,
-                "metadata": metadata or {},  # 返回时使用metadata键
+                "metadata": metadata or {},  # Use metadata on return
                 "user_id": user_id,
                 "files": {}
             }
             return db_dict
 
     def delete_database(self, db_id):
-        """删除知识库"""
+        """Remove knowledge base"""
         with self.get_session() as session:
             db = session.query(KnowledgeDatabase).filter_by(
                 db_id=db_id).first()
@@ -152,9 +152,9 @@ class KBDBManager:
                 return True
             return False
 
-    # 文件操作方法
+    # File Operating Method
     def add_file(self, db_id, file_id, filename, path, file_type, status="waiting"):
-        """添加文件"""
+        """Add File"""
         with self.get_session() as session:
             file = KnowledgeFile(
                 file_id=file_id,
@@ -167,7 +167,7 @@ class KBDBManager:
             session.add(file)
             session.flush()
 
-            # 返回字典而非对象，避免会话关闭后的延迟加载问题
+            # Return dictionary instead of object to avoid delay loading after session close
             return {
                 "file_id": file_id,
                 "filename": filename,
@@ -179,7 +179,7 @@ class KBDBManager:
             }
 
     def update_file_status(self, file_id, status):
-        """更新文件状态"""
+        """Update File Status"""
         with self.get_session() as session:
             file = session.query(KnowledgeFile).filter_by(
                 file_id=file_id).first()
@@ -189,7 +189,7 @@ class KBDBManager:
             return False
 
     def delete_file(self, file_id):
-        """删除文件"""
+        """Delete File"""
         with self.get_session() as session:
             file = session.query(KnowledgeFile).filter_by(
                 file_id=file_id).first()
@@ -199,7 +199,7 @@ class KBDBManager:
             return False
 
     def get_files_by_database(self, db_id):
-        """获取知识库下的所有文件"""
+        """Get all files under the knowledge base"""
         with self.get_session() as session:
             files = session.query(KnowledgeFile).options(
                 joinedload(KnowledgeFile.nodes)
@@ -207,16 +207,16 @@ class KBDBManager:
             return [self._to_dict_safely(file) for file in files]
 
     def get_file_by_id(self, file_id):
-        """根据ID获取文件"""
+        """Based onIDGet File"""
         with self.get_session() as session:
             file = session.query(KnowledgeFile).options(
                 joinedload(KnowledgeFile.nodes)
             ).filter_by(file_id=file_id).first()
             return self._to_dict_safely(file) if file else None
 
-    # 知识块操作方法
+    # Knowledge Block Operating Method
     def add_node(self, file_id, text, hash_value=None, start_char_idx=None, end_char_idx=None, metadata=None):
-        """添加知识块"""
+        """Add Knowledge Block"""
         with self.get_session() as session:
             node = KnowledgeNode(
                 file_id=file_id,
@@ -229,7 +229,7 @@ class KBDBManager:
             session.add(node)
             session.flush()
 
-            # 返回字典而非对象，避免会话关闭后的延迟加载问题
+            # Return dictionary instead of object to avoid delay loading after session close
             return {
                 "id": node.id,
                 "file_id": file_id,
@@ -241,14 +241,14 @@ class KBDBManager:
             }
 
     def get_nodes_by_file(self, file_id):
-        """获取文件下的所有知识块"""
+        """Get all knowledge blocks under the file"""
         with self.get_session() as session:
             nodes = session.query(KnowledgeNode).filter_by(
                 file_id=file_id).all()
             return [self._to_dict_safely(node) for node in nodes]
 
     def get_nodes_by_filter(self, file_id=None, search_text=None, limit=100):
-        """根据条件筛选知识块"""
+        """Filter the knowledge block by condition"""
         with self.get_session() as session:
             query = session.query(KnowledgeNode)
             if file_id:
@@ -260,7 +260,7 @@ class KBDBManager:
             return [self._to_dict_safely(node) for node in nodes]
 
     def get_user_knowledge_bases(self, user_id):
-        """根据用户ID获取知识库"""
+        """By UserIDAccess to the knowledge base"""
 
         with self.get_session() as session:
             databases = session.query(
@@ -268,7 +268,7 @@ class KBDBManager:
             return [self._to_dict_safely(db) for db in databases]
 
     def delete_user_knowledge_bases(self, user_id):
-        """根据用户ID删除知识库"""
+        """By UserIDRemove knowledge base"""
         with self.get_session() as session:
             databases = session.query(
                 KnowledgeDatabase).filter_by(user_id=user_id).all()
@@ -277,5 +277,5 @@ class KBDBManager:
             return True
 
 
-# 创建全局知识库数据库管理器实例
+# Examples of creating a global knowledge base database manager
 kb_db_manager = KBDBManager()

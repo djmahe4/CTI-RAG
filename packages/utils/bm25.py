@@ -2,62 +2,62 @@ from abc import ABC, abstractmethod
 from typing import List
 import math
 import jieba
-import Stemmer  # PyStemmer 庫，用于英文词干提取
-import re  # 用于英文文本预处理
-import json  # 用于保存和加载 JSON 格式
-import pickle  # 用于保存和加载 Pickle 格式
+import Stemmer  # PyStemmer Library for English-language dry extraction
+import re  # For pre-processing of English text
+import json  # To save and load JSON formats
+import pickle  # For saving and loading Pickle formats
 from .stopwords import (
     STOPWORDS_EN_PLUS,
     STOPWORDS_CHINESE,
 )
 
-# 抽象基类
+# Abstract Base Category
 class AbstractBM25(ABC):
     def __init__(self, corpus: List[str], k1: float = 1.5, b: float = 0.75, stopwords: tuple = ()):
         """
-        抽象基类，定义BM25的核心功能
+        Abstract Base Category，DefinitionsBM25Core functions
         
         Args:
-            corpus: 文档集合，每个元素是一个文档字符串
-            k1: 控制词频饱和度的参数
-            b: 控制文档长度归一化的参数
-            stopwords: 停用词元组
+            corpus: Document set，Each element is a document string
+            k1: Parameters to control word saturation
+            b: Parameters to control the consolidation of document lengths
+            stopwords: Disable Phrase Group
         Raises:
-            ValueError: 如果corpus为空
+            ValueError: IfcorpusEmpty
         """
         if not corpus:
             raise ValueError("Corpus cannot be empty")
         self.corpus = corpus
         self.k1 = k1
         self.b = b
-        self.stopwords = set(stopwords)  # 转换为set以提高查找效率
+        self.stopwords = set(stopwords)  # Convert to set to improve search efficiency
         self.doc_count = len(corpus)
 
-        # 分词后的文档集合，由子类实现
+        # Document collection after word-splitting, by subcategory
         self.tokenized_corpus = self._tokenize_corpus()
 
-        # 计算每个文档的长度（词数）
+        # Calculate the length of each document (number of words)
         self.doc_lengths = [len(tokens) for tokens in self.tokenized_corpus]
 
-        # 计算平均文档长度
+        # Calculating Average Document Length
         self.avg_doc_length = sum(self.doc_lengths) / self.doc_count if self.doc_count > 0 else 0
 
-        # 词频和文档频率
-        self.df = {}  # 文档频率
-        self.tf = []  # 词频矩阵
+        # Word frequency and document frequency
+        self.df = {}  # Document Frequency
+        self.tf = []  # Word frequency matrix
         self._build_index()
 
     @abstractmethod
     def _tokenize(self, text: str) -> List[str]:
-        """抽象方法：对文本进行分词"""
+        """Abstract Method：Split Text"""
         pass
 
     def _tokenize_corpus(self) -> List[List[str]]:
-        """对整个文档集合进行分词"""
+        """Interpret the whole document collection"""
         return [self._tokenize(doc) for doc in self.corpus]
 
     def _build_index(self):
-        """构建词频和文档频率索引"""
+        """Build word frequency and document frequency index"""
         for doc_id, tokens in enumerate(self.tokenized_corpus):
             term_freq = {}
             for term in tokens:
@@ -68,7 +68,7 @@ class AbstractBM25(ABC):
 
     def _score(self, query_tokens: List[str], doc_id: int) -> float:
         """
-        计算查询与文档的BM25得分
+        Calculating Query and DocumentBM25Score
         """
         score = 0.0
         doc_len = self.doc_lengths[doc_id]
@@ -90,7 +90,7 @@ class AbstractBM25(ABC):
 
     def search(self, query: str, top_k: int = 5) -> List[tuple]:
         """
-        执行搜索并返回排序后的结果
+        Run search and return sorted results
         """
         if top_k < 1:
             raise ValueError("top_k must be at least 1")
@@ -102,12 +102,12 @@ class AbstractBM25(ABC):
 
     def save(self, filepath: str):
         """
-        将BM25索引保存到文件（支持 JSON 和 Pickle 格式）
+        WillBM25Index to File（Support JSON and Pickle Format）
         
         Args:
-            filepath: 保存文件的路径（.json 或 .pkl）
+            filepath: Path to saving files（.json or .pkl）
         Raises:
-            ValueError: 如果文件扩展名不支持
+            ValueError: If file extensions are not supported
         """
         data = {
             'df': self.df,
@@ -129,15 +129,15 @@ class AbstractBM25(ABC):
     @classmethod
     def load(cls, filepath: str, corpus: List[str]):
         """
-        从文件加载BM25索引（支持 JSON 和 Pickle 格式）
+        Load from FileBM25Index（Support JSON and Pickle Format）
         
         Args:
-            filepath: 索引文件的路径（.json 或 .pkl）
-            corpus: 原始文档集合，用于初始化
+            filepath: Path to index file（.json or .pkl）
+            corpus: Original Document Pool，For initialization
         Returns:
-            EnglishBM25 或 ChineseBM25 实例
+            EnglishBM25 or ChineseBM25 Examples
         Raises:
-            ValueError: 如果文件扩展名或语言不支持
+            ValueError: If file extension or language is not supported
         """
         if filepath.endswith('.json'):
             with open(filepath, 'r', encoding='utf-8') as f:
@@ -164,51 +164,51 @@ class AbstractBM25(ABC):
         bm25.avg_doc_length = sum(bm25.doc_lengths) / len(bm25.doc_lengths) if bm25.doc_lengths else 0
         return bm25
 
-# 英文BM25实现（使用 PyStemmer 和停用词）
+# BM25 achieved in English (using PyStemmer and disablement)
 class EnglishBM25(AbstractBM25):
     def __init__(self, corpus: List[str], k1: float = 1.5, b: float = 0.75, stopwords: tuple = STOPWORDS_EN_PLUS):
         """
-        英文BM25实现，使用PyStemmer进行词干提取和停用词过滤
+        EnglishBM25Achieved，UsePyStemmerPerform word dry extraction and disable word filtering
         """
-        self.stemmer = Stemmer.Stemmer('english')  # 初始化英文词干提取器
+        self.stemmer = Stemmer.Stemmer('english')  # Initialization of English-language dry extractor
         super().__init__(corpus, k1, b, stopwords)
 
     def _tokenize(self, text: str) -> List[str]:
-        """英文分词：使用正则表达式预处理 + PyStemmer + 停用词过滤"""
+        """English crosswords：Preprocess with regular expression + PyStemmer + Disable word filtering"""
         text = text.lower()
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z0-9\s]', '', text)
         tokens = text.split()
         return [self.stemmer.stemWord(token) for token in tokens if token and token not in self.stopwords]
 
-# 中文BM25实现
+# BM25 Achieved in Chinese
 class ChineseBM25(AbstractBM25):
     def __init__(self, corpus: List[str], k1: float = 1.5, b: float = 0.75, stopwords: tuple = STOPWORDS_CHINESE):
         """
-        中文BM25实现，使用jieba分词和停用词过滤
+        ChineseBM25Achieved，UsejiebaSpelling and Disable Word Filtering
         """
         super().__init__(corpus, k1, b, stopwords)
 
     def _tokenize(self, text: str) -> List[str]:
-        """中文分词：使用jieba并过滤停用词"""
+        """Chinese：Usejiebaand filter disabled words"""
         text = re.sub(r'[^\u4e00-\u9fa5a-zA-Z]', '', text)
         tokens = jieba.cut(text)
         return [token for token in tokens if token and token not in self.stopwords]
 
-# 工厂函数
+# Plant Functions
 def create_bm25(corpus: List[str],
                 language: str, 
                 k1: float = 1.5,
                 b: float = 0.75,
                 stopwords: tuple = None):
     """
-    创建BM25实例的工厂函数
+    CreateBM25Plant function for instance
     
     Args:
-        corpus: 文档集合
-        language: 语言类型 ('english' 或 'chinese')
-        k1: 控制词频饱和度的参数
-        b: 控制文档长度归一化的参数
-        stopwords: 自定义停用词元组（可选）
+        corpus: Document set
+        language: Language type ('english' or 'chinese')
+        k1: Parameters to control word saturation
+        b: Parameters to control the consolidation of document lengths
+        stopwords: Custom Disable Phrases（Optional）
     """
     language = language.lower()
     if language in ['english', 'en']:
@@ -222,20 +222,20 @@ def create_bm25(corpus: List[str],
     
 def load_bm25(filepath: str, corpus: List[str]):
     """
-    从文件加载BM25实例
+    Load from FileBM25Examples
     
     Args:
-        filepath: 索引文件的路径（.json 或 .pkl）
-        corpus: 原始文档集合，用于初始化
+        filepath: Path to index file（.json or .pkl）
+        corpus: Original Document Pool，For initialization
     Returns:
-        BM25实例
+        BM25Examples
     """
     return AbstractBM25.load(filepath, corpus)
 
-# 通用的搜索函数
+# Common Search Functions
 def bm25_search(corpus: List[str], query: str, language: str, top_k: int = 5, k1: float = 1.5, b: float = 0.75, stopwords: tuple = None):
     """
-    执行BM25搜索
+    ImplementationBM25Search
     """
     bm25 = create_bm25(corpus, language, k1, b, stopwords)
     results = bm25.search(query, top_k)

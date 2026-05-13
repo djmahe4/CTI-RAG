@@ -1,4 +1,4 @@
-"""通用工具函数"""
+"""General Tool Functions"""
 
 import logging
 
@@ -9,20 +9,20 @@ from packages.manager.db_model import OperationLog, User
 
 
 def setup_logging():
-    """配置应用程序日志格式"""
-    # 配置日志格式
+    """Configure application log format"""
+    # Configure log format
     logging.basicConfig(
         level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s", datefmt="%Y-%m-%d %H:%M:%S", force=True
     )
 
-    # 确保uvicorn的日志也使用相同格式
+    # Make sure uvicorn logs are in the same format.
     uvicorn_logger = logging.getLogger("uvicorn")
     uvicorn_access_logger = logging.getLogger("uvicorn.access")
 
-    # 创建格式化器
+    # Create Formatter
     formatter = logging.Formatter(fmt="%(asctime)s %(levelname)s: %(message)s", datefmt="%m-%d %H:%M:%S")
 
-    # 为所有处理器设置格式化器
+    # Set formatting for all processors
     for handler in uvicorn_logger.handlers:
         handler.setFormatter(formatter)
     for handler in uvicorn_access_logger.handlers:
@@ -30,7 +30,7 @@ def setup_logging():
 
 
 def log_operation(db: Session, user_id: int, operation: str, details: str = None, request: Request = None):
-    """记录用户操作日志"""
+    """Record user operations log"""
     ip_address = None
     if request:
         ip_address = request.client.host if request.client else None
@@ -41,12 +41,12 @@ def log_operation(db: Session, user_id: int, operation: str, details: str = None
 
 
 def get_user_dict(user: User, include_password: bool = False) -> dict:
-    """获取用户字典表示"""
+    """Get user dictionaries for"""
     return user.to_dict(include_password)
 
 
 def convert_serializable(obj):
-    """将对象转换为可序列化的格式"""
+    """Convert objects to serialized formats"""
     if isinstance(obj, list | tuple):
         return [convert_serializable(item) for item in obj]
     if isinstance(obj, dict):

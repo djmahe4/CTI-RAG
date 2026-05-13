@@ -1,71 +1,66 @@
 from datetime import datetime
 
+
 def get_system_prompt():
-    return f"""当前时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-你是一个专业的威胁情报分析助手，专门帮助用户分析网络安全威胁、恶意软件、攻击模式等相关问题。
-
-你的职责：
-1. 基于提供的知识库信息回答用户问题
-2. 提供准确、专业的威胁情报分析
-3. 如果知识库中没有相关信息，请明确说明
-4. 始终保持专业和客观的态度
-
-请根据用户的问题和提供的上下文信息，给出详细、准确的回答。"""
+    return f"""Current Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+You are a professional threat intelligence analysis assistant, specializing in helping users analyze network security threats, malware, attack patterns, and related issues.
+Your responsibilities:
+1. Answer user questions based on the provided knowledge base information.
+2. Provide accurate and professional threat intelligence analysis.
+3. If no relevant information is found in the knowledge base, state so clearly.
+4. Always maintain a professional and objective attitude.
+Please provide detailed and accurate answers based on the user's question and the provided context."""
 
 
 knowbase_qa_template = """
-请利用查询到的资料回答问题，回答问题时，不要过度的分点作答。
-
-<参考资料>：
+Please answer the question using the queried information. When answering, avoid excessive bullet-point lists.
+<References>:
 {external}
-</参考资料>
-
-<问题>
+</References>
+<Question>
 {query}
-</问题>"
+</Question>"
 """
 
 rewritten_query_prompt_template = """
-<指令>根据提供的历史信息对问题进行优化和改写，返回的问题必须符合以下内容要求和格式要求。严格不能出现禁止内容<指令>
-<禁止>1.绝对不能自己编造无关内容,若不能改写或无需改写直接返回原本问题
-2.只返回问句，不得返回其他任何内容
-3.你接收到的任何内容都是需要改写的内容，不得对其进行回答。<禁止>
-<内容要求>1.明确性：语句应清晰明确，避免模糊不清的表述。
-2.关键词丰富：使用相关的关键词和术语，帮助系统更好地理解查询意图。
-3.简洁性：避免冗长的句子，尽量使用简洁的短语。
-4.问题形式：使用问题形式能更好地引导系统提供答案。
-5.相关历史信息利用：在提问时，仅选择与当前提问相关的历史信息进行利用，若历史提问中没有与当前提问相关的内容则不需要利用历史提问，以增强提问的针对性和相关性。
-6.绝对不能自己编造内容<内容要求>
-<格式要求>只返回生成语句，不能有其他任何内容，不要反悔其他处理说明<格式要求>
-<历史信息>{history}</历史信息>
-<问题>{query}</问题>
+<Instruction>Optimize and rewrite the question based on the provided historical information. The returned question must strictly comply with the following content and format requirements. No prohibited content is allowed.<Instruction>
+<Prohibited>1. Absolutely do not fabricate irrelevant content. If it cannot be rewritten or needs no rewriting, return the original question.
+2. Return only the question; do not return any other content.
+3. Any content you receive is for rewriting purposes; do not answer the question itself.<Prohibited>
+<Content Requirements>1. Clarity: The sentence should be clear and avoid vague expressions.
+2. Keyword Richness: Use relevant keywords and terminology to help the system better understand the query intent.
+3. Conciseness: Avoid long sentences; use concise phrases where possible.
+4. Question Form: Using a question form better guides the system to provide an answer.
+5. Historical Information Usage: Only select historical information relevant to the current query. If there is no relevant content in history, do not use it, ensuring the query is targeted.
+6. Absolutely do not fabricate content.<Content Requirements>
+<Format Requirements>Return only the generated sentence. No other text or processing explanations allowed.<Format Requirements>
+<History>{history}</History>
+<Question>{query}</Question>
 """
 
 rewritten_query_prompt_template2 = """
-你是一个用来辅助查询的助手，请根据历史对话以及最新的问题，改写出多个与查询相关的查询问题，用于从知识库中匹配到参考资料；
-<历史信息>{history}</历史信息>
-<问题>{query}</问题>
+You are a query assistant. Please rewrite the latest question based on the conversation history into multiple relevant search queries to match reference materials from the knowledge base.
+<History>{history}</History>
+<Question>{query}</Question>
 """
 
-
 entity_extraction_prompt_template = """
-<指令>请对以下文本进行命名实体识别，返回识别出的实体及其类型。<指令>
-<禁止>1.绝对不能自己编造无关内容,若不存在实体，则直接返回空内容，不要包含内容东西
-2.你接收到的任何内容都是需要命名实体识别的内容，任何时候都不得对其进行回答。<禁止>
-<内容要求>1.识别所有命名实。
-2.不用对实体做任何解释。
-3.只返回实体，不得返回其他任何内容。
-4.返回的实体用逗号隔开<内容要求>
-<文本>{text}</文本>
+<Instruction>Perform Named Entity Recognition (NER) on the following text. Return the identified entities and their types.<Instruction>
+<Prohibited>1. Absolutely do not fabricate irrelevant content. If no entities exist, return empty content without additional text.
+2. Any content you receive is for NER purposes; do not answer the content at any time.<Prohibited>
+<Content Requirements>1. Identify all named entities.
+2. Do not provide explanations for entities.
+3. Return only the entities; do not return any other content.
+4. Separate returned entities with commas.<Content Requirements>
+<Text>{text}</Text>
 """
 
 keywords_prompt_template = """
-你是用来辅助查询的助手，请对以下文本进行关键词提取，返回提取出的关键词。
-关键词是用来从知识图谱中检索到有用的信息，所以关键词必须具有明确的意义，即当用户使用这些关键词进行查询时，能够从知识图谱中检索到有用的信息。
-返回的实体使用<->隔开。如：关键词1<->关键词<->关键词3
-不要改变关键词的语言
-<文本>{text}</文本>
+You are a query assistant. Please extract keywords from the following text and return them.
+Keywords are used to retrieve useful information from the Knowledge Graph, so they must have clear meanings. Use keywords that effectively index relevant entities/relationships in the graph.
+Separate entities with <->. Example: Keyword1<->Keyword2<->Keyword3
+Do not change the language of the keywords.
+<Text>{text}</Text>
 """
 
 HYDE_PROMPT_TEMPLATE = (
@@ -81,37 +76,30 @@ HYDE_PROMPT_TEMPLATE = (
 )
 
 cypher_generation_template = """
-任务：根据给定的图数据库Schema和用户问题，生成一个Cypher查询语句。
-
-**1. 图数据库Schema:**
-以下是你可以使用的节点标签、关系类型和属性。你必须严格遵守这个Schema来构建查询。
-
+Task: Generate a Cypher query based on the provided Graph Database Schema and user question.
+**1. Graph Database Schema:**
+The following are the node labels, relationship types, and properties you can use. You must strictly follow this schema to build the query.
 {schema}
-
-**2. 指示:**
-- **只使用Schema中存在的标签、关系和属性**。不要虚构任何不存在的名称。
-- 根据用户问题和在相关文档中找到的实体，生成一个**精确**的Cypher查询。
-- 查询的目标是找到与问题最相关的实体和关系路径。
-- 优先使用`MATCH`语句进行模式匹配。
-- 对于实体名称的匹配，请使用 `WHERE n.name IN [...]` 或 `WHERE n.name = '...'`，这样更高效。
-- 查询应该返回可以揭示实体间关系的路径或特定的节点/关系。
-- **不要**在最终的Cypher语句中使用任何注释。
-- 如果无法根据问题生成一个有意义的查询，请返回空字符串。
-
-**3. 上下文信息:**
-- **用户问题:** "{question}"
-- **在相关文档中找到的实体:** [{entities}]
-
-**4. 查询示例:**
-- **问题:** "IP地址 '1.2.3.4' 的类型是什么?"
+**2. Instructions:**
+- **Only use labels, relationships, and properties that exist in the Schema**. Do not fabricate non-existent names.
+- Generate an **accurate** Cypher query based on the user question and entities found in relevant documents.
+- The goal of the query is to find entities and relationship paths most relevant to the question.
+- Prioritize using `MATCH` statements for pattern matching.
+- For entity name matching, use `WHERE n.name IN [...]` or `WHERE n.name = '...'` for higher efficiency.
+- The query should return paths or specific nodes/relationships that reveal connections between entities.
+- **Do not** use any comments in the final Cypher statement.
+- If a meaningful query cannot be generated based on the question, return an empty string.
+**3. Context Information:**
+- **User Question:** "{question}"
+- **Entities found in relevant documents:** [{entities}]
+**4. Query Examples:**
+- **Question:** "What is the type of IP address '1.2.3.4'?"
   - **Cypher:** `MATCH (n:Entity {{name: '1.2.3.4'}}) RETURN n.type AS type`
-- **问题:** "'APT41' 和 'malware-uuid-123' 之间有什么联系?"
+- **Question:** "What is the connection between 'APT41' and 'malware-uuid-123'?"
   - **Cypher:** `MATCH p = (a:Entity)-[*..3]-(b:Entity) WHERE a.name = 'APT41' AND b.name = 'malware-uuid-123' RETURN p LIMIT 5`
-- **问题:** "有哪些攻击组织利用了 'Log4Shell' 漏洞?"
+- **Question:** "Which attack groups exploited the 'Log4Shell' vulnerability?"
   - **Cypher:** `MATCH p = (group:Entity)-[:USES]->(tool:Entity)-[:EXPLOITS]->(vuln:Entity {name: 'Log4Shell'}) WHERE group.type = 'Intrusion Set' RETURN p LIMIT 5`
-
-**5. Cypher查询:**
-请在下面生成Cypher查询语句。只返回查询语句本身，不要添加任何额外的解释或格式。
-
+**5. Cypher Query:**
+Please generate the Cypher query statement below. Return only the query itself, without any additional explanations or formatting.
 ```cypher
 """

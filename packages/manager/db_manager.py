@@ -9,34 +9,34 @@ from packages import config
 from packages.utils.logging_config import logger
 
 class DBManager:
-    """数据库管理器 - 提供MySQL数据库连接和会话管理"""
+    """Database Manager - ProvisionMySQLDatabase connection and session management"""
 
     def __init__(self):
-        # 从环境变量或配置中获取MySQL连接信息
+        # Get MySQL connection information from an environmental variable or configuration
         mysql_host = os.getenv("MYSQL_HOST", "mysql")
         mysql_port = os.getenv("MYSQL_PORT", "3306")
         mysql_db = os.getenv("MYSQL_DB", "knowledge_db")
         mysql_user = os.getenv("MYSQL_USER", "mysql")
         mysql_password = os.getenv("MYSQL_PASSWORD", "12345678")
         
-        # 构建MySQL连接URL
+        # Build MySQL connection URL
         self.db_url = f"mysql+pymysql://{mysql_user}:{mysql_password}@{mysql_host}:{mysql_port}/{mysql_db}"
         
-        # 创建SQLAlchemy引擎
+        # Create SQLAlchemy Engine
         self.engine = create_engine(self.db_url)
         
-        # 创建会话工厂
+        # Create Session Factory
         self.Session = sessionmaker(bind=self.engine)
         
         logger.info(f"Database connected to MySQL at {mysql_host}:{mysql_port}")
 
     def get_session(self):
-        """获取数据库会话"""
+        """Fetch database sessions"""
         return self.Session()
 
     @contextmanager
     def get_session_context(self):
-        """获取数据库会话的上下文管理器"""
+        """Context manager for accessing database sessions"""
         session = self.Session()
         try:
             yield session
@@ -49,13 +49,13 @@ class DBManager:
             session.close()
 
     def check_first_run(self):
-        """检查是否首次运行"""
+        """Check if first run"""
         session = self.get_session()
         try:
-            # 检查是否有任何用户存在
+            # Check if any users exist
             return session.query(User).count() == 0
         finally:
             session.close()
 
-# 创建全局数据库管理器实例
+# Create global database manager instance
 db_manager = DBManager()

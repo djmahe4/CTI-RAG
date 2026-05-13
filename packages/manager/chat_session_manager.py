@@ -1,5 +1,5 @@
 """
-聊天会话管理器 - 整合 MySQL 主存储和 Redis 缓存
+Chat Session Manager - Integration MySQL Main Storage and Redis Cache
 """
 import json
 import uuid
@@ -14,19 +14,19 @@ from packages.utils.logging_config import logger
 
 
 class ChatSessionManager:
-    """聊天会话管理器 - MySQL作为主存储，Redis作为缓存"""
+    """Chat Session Manager - MySQLAs Primary Storage，RedisAs Cache"""
 
     def __init__(self, redis_manager=None):
-        """初始化会话管理器
+        """Initialising Session Manager
         
         Args:
-            redis_manager: Redis会话管理器实例（可选）
+            redis_manager: RedisSession Manager Example（Optional）
         """
         self.redis_manager = redis_manager
-        self.cache_expire_time = 3600  # Redis缓存1小时
+        self.cache_expire_time = 3600  # Redis cache 1 hour
 
     def _get_cache_key(self, session_id: str) -> str:
-        """获取Redis缓存键"""
+        """AccessRedisCache keys"""
         return f"chat_session:{session_id}"
 
     async def create_session(
@@ -35,30 +35,30 @@ class ChatSessionManager:
         title: str = None,
         system_prompt: str = None
     ) -> str:
-        """创建新会话
+        """Create a new session
         
         Args:
-            user_id: 用户ID
-            title: 会话标题（可选，最大50字符）
-            system_prompt: 系统提示词（可选）
+            user_id: UserID
+            title: Session Title（Optional，Max50Character）
+            system_prompt: System Hint（Optional）
             
         Returns:
-            新会话ID (UUID格式)
+            New SessionID (UUIDFormat)
         """
         session_id = str(uuid.uuid4())
         
         try:
             with db_manager.get_session_context() as db_session:
-                # 生成默认标题
-                default_title = f"对话 {datetime.now().strftime('%m-%d %H:%M')}"
+                # Generate Default Title
+                default_title = f"Dialogue {datetime.now().strftime('%m-%d %H:%M')}"
                 
-                # 确保标题不超过50字符
+                # Ensure that the title does not exceed 50 words Arguments
                 if title:
                     title = title[:50] if len(title) > 50 else title
                 else:
                     title = default_title
                 
-                # 创建会话记录
+                # Create Session Record
                 new_session = ChatSession(
                     session_id=session_id,
                     user_id=user_id,
@@ -68,7 +68,7 @@ class ChatSessionManager:
                 db_session.add(new_session)
                 db_session.flush()
                 
-                # 如果有系统提示词，添加为第一条消息
+                # Add the first message if there is a systematic hint
                 if system_prompt:
                     system_msg = ChatMessage(
                         session_id=session_id,
@@ -79,9 +79,9 @@ class ChatSessionManager:
                 
                 db_session.commit()
                 
-                logger.info(f"创建新会话成功: session_id={session_id}, user_id={user_id}")
+                logger.info(f"Successfully created new session: session_id={session_id}, user_id={user_id}")
                 
-                # 缓存到Redis
+                # Cache to Redis
                 if self.redis_manager:
                     session_data = {
                         "session_id": session_id,
@@ -95,7 +95,7 @@ class ChatSessionManager:
                 return session_id
                 
         except Exception as e:
-            logger.error(f"创建会话失败: {e}")
+            logger.error(f"Failed to create session: {e}")
             raise
 
     async def get_session(
@@ -104,31 +104,31 @@ class ChatSessionManager:
         user_id: int = None,
         include_messages: bool = False
     ) -> Optional[Dict]:
-        """获取会话信息（先从Redis查，再从MySQL查）
+        """Fetch Session Information（FirstRedisCha.，FromMySQLCha.）
         
         Args:
-            session_id: 会话ID
-            user_id: 用户ID（可选，用于权限校验）
-            include_messages: 是否包含消息列表
+            session_id: SessionID
+            user_id: UserID（Optional，For Permission Validation）
+            include_messages: Can not open message
             
         Returns:
-            会话信息字典或None
+            Session Information Dictionary orNone
         """
-        # 1. 先尝试从Redis获取
+        # 1. Try to get first from Redis
         if self.redis_manager and not include_messages:
             try:
                 cached_session = await self.redis_manager.get_session(session_id)
                 if cached_session:
-                    # 校验用户权限
+                    # Verify User Permissions
                     if user_id and cached_session.get("user_id") != user_id:
-                        logger.warning(f"用户 {user_id} 无权访问会话 {session_id}")
+                        logger.warning(f"User {user_id} No access to session {session_id}")
                         return None
-                    logger.debug(f"从Redis缓存获取会话: {session_id}")
+                    logger.debug(f"FromRedisCache Fetch Session: {session_id}")
                     return cached_session
             except Exception as e:
-                logger.warning(f"从Redis获取会话失败: {e}")
+                logger.warning(f"FromRedisFailed to fetch session: {e}")
         
-        # 2. 从MySQL获取
+        # 2. Access from MySQL
         try:
             with db_manager.get_session_context() as db_session:
                 query = db_session.query(ChatSession).filter(
@@ -136,28 +136,28 @@ class ChatSessionManager:
                     ChatSession.is_deleted == 0
                 )
                 
-                # 如果提供了user_id，添加权限过滤
+                # Add permission filter if user id is provided
                 if user_id:
                     query = query.filter(ChatSession.user_id == user_id)
                 
                 session = query.first()
                 
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return None
                 
                 session_data = session.to_dict(include_messages=include_messages)
                 
-                logger.debug(f"从MySQL获取会话: {session_id}")
+                logger.debug(f"FromMySQLFetch Session: {session_id}")
                 
-                # 缓存到Redis（不包含完整消息列表）
+                # Can not open message
                 if self.redis_manager and not include_messages:
                     await self.redis_manager.set_session(session_id, session_data)
                 
                 return session_data
                 
         except Exception as e:
-            logger.error(f"获取会话失败: {e}")
+            logger.error(f"Failed to fetch session: {e}")
             return None
 
     async def get_history(
@@ -166,35 +166,35 @@ class ChatSessionManager:
         user_id: int = None,
         limit: int = None
     ) -> List[Dict]:
-        """获取会话历史消息（先从Redis查，再从MySQL查）
+        """Fetch Session History Message（FirstRedisCha.，FromMySQLCha.）
         
         Args:
-            session_id: 会话ID
-            user_id: 用户ID（可选，用于权限校验）
-            limit: 限制返回消息数量（可选）
+            session_id: SessionID
+            user_id: UserID（Optional，For Permission Validation）
+            limit: Limit the number of returns（Optional）
             
         Returns:
-            消息列表
+            Message List
         """
-        # 1. 先尝试从Redis获取
+        # 1. Try to get first from Redis
         if self.redis_manager:
             try:
                 cached_history = await self.redis_manager.get_history(session_id)
                 if cached_history:
-                    # 简单的权限校验：通过session获取user_id
+                    # Simple permission to verify: access user id through session
                     session = await self.redis_manager.get_session(session_id)
                     if session and (not user_id or session.get("user_id") == user_id):
-                        logger.debug(f"从Redis缓存获取历史: {session_id}, {len(cached_history)} 条消息")
+                        logger.debug(f"FromRedisCache For History: {session_id}, {len(cached_history)} Message")
                         if limit:
                             return cached_history[-limit:]
                         return cached_history
             except Exception as e:
-                logger.warning(f"从Redis获取历史失败: {e}")
+                logger.warning(f"FromRedisFailed to capture history: {e}")
         
-        # 2. 从MySQL获取
+        # 2. Access from MySQL
         try:
             with db_manager.get_session_context() as db_session:
-                # 先验证会话权限
+                # Authenticate Session Permissions
                 session_query = db_session.query(ChatSession).filter(
                     ChatSession.session_id == session_id,
                     ChatSession.is_deleted == 0
@@ -204,17 +204,17 @@ class ChatSessionManager:
                 
                 session = session_query.first()
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return []
                 
-                # 查询消息
+                # Query Message
                 messages_query = db_session.query(ChatMessage).filter(
                     ChatMessage.session_id == session_id,
                     ChatMessage.is_deleted == 0
                 ).order_by(ChatMessage.created_at)
                 
                 if limit:
-                    # 获取最近的N条消息
+                    # Get Recent N Messages
                     messages_query = messages_query.order_by(desc(ChatMessage.created_at)).limit(limit)
                     messages = list(reversed(messages_query.all()))
                 else:
@@ -229,9 +229,9 @@ class ChatSessionManager:
                     for msg in messages
                 ]
                 
-                logger.debug(f"从MySQL获取历史: {session_id}, {len(history)} 条消息")
+                logger.debug(f"FromMySQLGet History: {session_id}, {len(history)} Message")
                 
-                # 缓存到Redis
+                # Cache to Redis
                 if self.redis_manager:
                     session_data = {
                         "session_id": session_id,
@@ -245,7 +245,7 @@ class ChatSessionManager:
                 return history
                 
         except Exception as e:
-            logger.error(f"获取历史消息失败: {e}")
+            logger.error(f"Failed to retrieve historical messages: {e}")
             return []
 
     async def add_message(
@@ -256,22 +256,22 @@ class ChatSessionManager:
         user_id: int = None,
         meta: Dict = None
     ) -> bool:
-        """添加消息到会话（同时写入MySQL和Redis）
+        """Can not open message（Writing simultaneouslyMySQLandRedis）
         
         Args:
-            session_id: 会话ID
-            role: 角色 (user/assistant/system)
-            content: 消息内容
-            user_id: 用户ID（可选，用于权限校验）
-            meta: 额外元数据（可选）
+            session_id: SessionID
+            role: Role (user/assistant/system)
+            content: Message Contents
+            user_id: UserID（Optional，For Permission Validation）
+            meta: Extra metadata（Optional）
             
         Returns:
-            是否成功
+            Success
         """
         try:
-            # 1. 写入MySQL
+            # 1. Writing MySQL
             with db_manager.get_session_context() as db_session:
-                # 验证会话权限
+                # Verify Session Permissions
                 session_query = db_session.query(ChatSession).filter(
                     ChatSession.session_id == session_id,
                     ChatSession.is_deleted == 0
@@ -281,10 +281,10 @@ class ChatSessionManager:
                 
                 session = session_query.first()
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return False
                 
-                # 创建消息
+                # Can not open message
                 new_message = ChatMessage(
                     session_id=session_id,
                     role=role,
@@ -293,25 +293,25 @@ class ChatSessionManager:
                 )
                 db_session.add(new_message)
                 
-                # 更新会话的updated_at
+                # Updateed session
                 session.updated_at = datetime.now()
                 
                 db_session.commit()
                 
-                logger.debug(f"添加消息到MySQL: session={session_id}, role={role}")
+                logger.debug(f"Can not open messageMySQL: session={session_id}, role={role}")
             
-            # 2. 更新Redis缓存
+            # Update the Redis cache
             if self.redis_manager:
                 try:
                     await self.redis_manager.add_message(session_id, role, content)
-                    logger.debug(f"添加消息到Redis缓存: session={session_id}, role={role}")
+                    logger.debug(f"Can not open messageRedisCache: session={session_id}, role={role}")
                 except Exception as e:
-                    logger.warning(f"更新Redis缓存失败: {e}")
+                    logger.warning(f"UpdateRedisCache Failed: {e}")
             
             return True
             
         except Exception as e:
-            logger.error(f"添加消息失败: {e}")
+            logger.error(f"Can not open message: {e}")
             return False
 
     async def update_session(
@@ -321,16 +321,16 @@ class ChatSessionManager:
         title: str = None,
         system_prompt: str = None
     ) -> bool:
-        """更新会话信息
+        """Update Session Information
         
         Args:
-            session_id: 会话ID
-            user_id: 用户ID
-            title: 新标题（可选，最大50字符）
-            system_prompt: 新系统提示词（可选）
+            session_id: SessionID
+            user_id: UserID
+            title: New Title（Optional，Max50Character）
+            system_prompt: New System Hint（Optional）
             
         Returns:
-            是否成功
+            Success
         """
         try:
             with db_manager.get_session_context() as db_session:
@@ -341,11 +341,11 @@ class ChatSessionManager:
                 ).first()
                 
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return False
                 
                 if title is not None:
-                    # 确保标题不超过50字符
+                    # Ensure that the title does not exceed 50 words Arguments
                     session.title = title[:50] if len(title) > 50 else title
                 if system_prompt is not None:
                     session.system_prompt = system_prompt
@@ -353,19 +353,19 @@ class ChatSessionManager:
                 session.updated_at = datetime.now()
                 db_session.commit()
                 
-                logger.info(f"更新会话成功: {session_id}")
+                logger.info(f"Update session successfully: {session_id}")
                 
-                # 清除Redis缓存，下次访问时重新加载
+                # Clear Redis cache, reload next visit
                 if self.redis_manager:
                     try:
                         await self.redis_manager.delete_session(session_id)
                     except Exception as e:
-                        logger.warning(f"清除Redis缓存失败: {e}")
+                        logger.warning(f"ClearRedisCache Failed: {e}")
                 
                 return True
                 
         except Exception as e:
-            logger.error(f"更新会话失败: {e}")
+            logger.error(f"Update session failed: {e}")
             return False
 
     async def delete_session(
@@ -374,15 +374,15 @@ class ChatSessionManager:
         user_id: int,
         hard_delete: bool = False
     ) -> bool:
-        """删除会话（软删除或硬删除）
+        """Remove Session（Soft or hard to delete）
         
         Args:
-            session_id: 会话ID
-            user_id: 用户ID
-            hard_delete: 是否硬删除（默认软删除）
+            session_id: SessionID
+            user_id: UserID
+            hard_delete: Delete Hardly（Default Soft Delete）
             
         Returns:
-            是否成功
+            Success
         """
         try:
             with db_manager.get_session_context() as db_session:
@@ -392,33 +392,33 @@ class ChatSessionManager:
                 ).first()
                 
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return False
                 
                 if hard_delete:
-                    # 硬删除：物理删除记录
+                    # Hard Delete: Physical Delete Record
                     db_session.delete(session)
-                    logger.info(f"硬删除会话: {session_id}")
+                    logger.info(f"Hardly delete session: {session_id}")
                 else:
-                    # 软删除：标记为已删除
+                    # Soft Delete: mark as deleted
                     session.is_deleted = 1
                     session.updated_at = datetime.now()
-                    logger.info(f"软删除会话: {session_id}")
+                    logger.info(f"Soft Delete Session: {session_id}")
                 
                 db_session.commit()
                 
-                # 删除Redis缓存
+                # Remove Redis Cache
                 if self.redis_manager:
                     try:
                         await self.redis_manager.delete_session(session_id)
-                        logger.debug(f"删除Redis缓存: {session_id}")
+                        logger.debug(f"DeleteRedisCache: {session_id}")
                     except Exception as e:
-                        logger.warning(f"删除Redis缓存失败: {e}")
+                        logger.warning(f"DeleteRedisCache Failed: {e}")
                 
                 return True
                 
         except Exception as e:
-            logger.error(f"删除会话失败: {e}")
+            logger.error(f"Failed to delete session: {e}")
             return False
 
     async def list_user_sessions(
@@ -428,16 +428,16 @@ class ChatSessionManager:
         offset: int = 0,
         include_deleted: bool = False
     ) -> List[Dict]:
-        """获取用户的所有会话列表
+        """Can not open message
         
         Args:
-            user_id: 用户ID
-            limit: 限制数量
-            offset: 偏移量
-            include_deleted: 是否包含已删除的会话
+            user_id: UserID
+            limit: Limited number
+            offset: Offset
+            include_deleted: Whether to include deleted sessions
             
         Returns:
-            会话列表
+            Session List
         """
         try:
             with db_manager.get_session_context() as db_session:
@@ -454,12 +454,12 @@ class ChatSessionManager:
                 
                 result = [session.to_dict(include_messages=False) for session in sessions]
                 
-                logger.debug(f"获取用户 {user_id} 的会话列表: {len(result)} 个")
+                logger.debug(f"Get Users {user_id} Organisation: {len(result)} individual")
                 
                 return result
                 
         except Exception as e:
-            logger.error(f"获取用户会话列表失败: {e}")
+            logger.error(f"Failed to fetch user session list: {e}")
             return []
 
     async def delete_message(
@@ -468,19 +468,19 @@ class ChatSessionManager:
         session_id: str,
         user_id: int
     ) -> bool:
-        """删除单条消息（软删除）
+        """Can not open message（Soft Delete）
         
         Args:
-            message_id: 消息ID
-            session_id: 会话ID
-            user_id: 用户ID
+            message_id: MessageID
+            session_id: SessionID
+            user_id: UserID
             
         Returns:
-            是否成功
+            Success
         """
         try:
             with db_manager.get_session_context() as db_session:
-                # 验证权限
+                # Authentication Permissions
                 session = db_session.query(ChatSession).filter(
                     ChatSession.session_id == session_id,
                     ChatSession.user_id == user_id,
@@ -488,17 +488,17 @@ class ChatSessionManager:
                 ).first()
                 
                 if not session:
-                    logger.warning(f"会话不存在或无权访问: {session_id}")
+                    logger.warning(f"Session does not exist or has no access: {session_id}")
                     return False
                 
-                # 删除消息
+                # Can not open message
                 message = db_session.query(ChatMessage).filter(
                     ChatMessage.id == message_id,
                     ChatMessage.session_id == session_id
                 ).first()
                 
                 if not message:
-                    logger.warning(f"消息不存在: {message_id}")
+                    logger.warning(f"Message does not exist: {message_id}")
                     return False
                 
                 message.is_deleted = 1
@@ -506,28 +506,28 @@ class ChatSessionManager:
                 
                 db_session.commit()
                 
-                logger.info(f"删除消息: message_id={message_id}")
+                logger.info(f"Can not open message: message_id={message_id}")
                 
-                # 清除Redis缓存
+                # Clear Redis cache
                 if self.redis_manager:
                     try:
                         await self.redis_manager.delete_session(session_id)
                     except Exception as e:
-                        logger.warning(f"清除Redis缓存失败: {e}")
+                        logger.warning(f"ClearRedisCache Failed: {e}")
                 
                 return True
                 
         except Exception as e:
-            logger.error(f"删除消息失败: {e}")
+            logger.error(f"Can not open message: {e}")
             return False
 
 
-# 创建全局会话管理器实例（在API中初始化时注入Redis管理器）
+# Create global session manager instance (injecting Redis manager at initialization in API)
 chat_session_manager = None
 
 
 def get_chat_session_manager(redis_manager=None):
-    """获取会话管理器实例（单例模式）"""
+    """Fetch Session Manager Example（Single case mode）"""
     global chat_session_manager
     if chat_session_manager is None:
         chat_session_manager = ChatSessionManager(redis_manager=redis_manager)

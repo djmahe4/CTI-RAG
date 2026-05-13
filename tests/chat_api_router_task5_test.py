@@ -177,6 +177,7 @@ def _load_chat_api_module():
     fastapi_module.Depends = _identity
     fastapi_module.HTTPException = _HTTPException
     fastapi_module.Header = _identity
+    fastapi_module.Request = _identity
 
     fastapi_responses_module = types.ModuleType("fastapi.responses")
 
@@ -196,6 +197,19 @@ def _load_chat_api_module():
 
     langchain_messages_module.AIMessageChunk = _AIMessageChunk
 
+    slowapi_module = types.ModuleType("slowapi")
+    class _Limiter:
+        def __init__(self, *args, **kwargs): pass
+        def limit(self, *args, **kwargs):
+            def _decorator(func): return func
+            return _decorator
+    slowapi_module.Limiter = _Limiter
+
+    slowapi_util_module = types.ModuleType("slowapi.util")
+    slowapi_util_module.get_remote_address = lambda *args, **kwargs: "127.0.0.1"
+
+    sys.modules["slowapi"] = slowapi_module
+    sys.modules["slowapi.util"] = slowapi_util_module
     sys.modules["packages"] = packages_module
     sys.modules["packages.config"] = config_module
     sys.modules["packages.models"] = models_module
@@ -251,6 +265,7 @@ def test_temporary_chat_stream_contains_actual_model_metadata_from_router():
 
     async def _run():
         response = await chat_api.temporary_chat(
+            request="mock_request",
             query="hello router",
             meta={"model_provider": "deepseek", "model_name": "deepseek-chat"},
         )
@@ -383,6 +398,7 @@ def test_stream_retrieval_gating_still_respects_use_web_without_db_id():
 
     async def _run():
         response = await chat_api.chat_post(
+            request="mock_request",
             query="hello",
             user_id=1,
             thread_id="thread-1",
@@ -398,3 +414,32 @@ def test_stream_retrieval_gating_still_respects_use_web_without_db_id():
     assert retriever_calls
     assert chunks[0]["status"] == "searching"
     assert chunks[1]["status"] == "generating"
+if __name__ == "__main__":
+    print("Running Chat API Task 5 tests...")
+    import inspect
+
+    functions = [
+        obj for name, obj in inspect.getmembers(sys.modules[__name__])
+        if (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj)) and name.startswith("test_")
+    ]
+    
+    passed = 0
+    failed = 0
+    for func in functions:
+        print(f"Running {func.__name__}...", end=" ", flush=True)
+        try:
+            if inspect.iscoroutinefunction(func):
+                asyncio.run(func())
+            else:
+                func()
+            print("PASSED")
+            passed += 1
+        except Exception as e:
+            print(f"FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            failed += 1
+            
+    print(f"\nTests complete: {passed} passed, {failed} failed.")
+    if failed > 0:
+        sys.exit(1)

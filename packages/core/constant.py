@@ -1,86 +1,85 @@
 # ==============================================================================
-# 修订后的实体类型 (参考 STIX 2.1 核心对象)
+# Revised Entity Types (Reference STIX 2.1 Core Objects)
 # ==============================================================================
 STIX_ENTITY_TYPES = {
-    # 威胁主体 (Threat Actors & Campaigns)
-    "THREAT_ACTOR": "threat-actor",          # 威胁行动者 (替代 ATTACK_ORGANIZATION)
-    "INTRUSION_SET": "intrusion-set",        # 入侵集合
-    "CAMPAIGN": "campaign",                  # 战役 (新增)
+    # Threat Actors & Campaigns
+    "THREAT_ACTOR": "threat-actor",          # Threat Actor (substitutes ATTACK_ORGANIZATION)
+    "INTRUSION_SET": "intrusion-set",        # Intrusion Set
+    "CAMPAIGN": "campaign",                  # Campaign (New)
 
-    # 威胁手段 (TTPs & Malware)
-    "ATTACK_PATTERN": "attack-pattern",      # 攻击模式 (TTPs，非常重要)
-    "MALWARE": "malware",                    # 恶意软件
-    "TOOL": "tool",                          # 工具 (被用于攻击的合法或非法软件)
-    "PAYLOAD": "payload",                    # 有效载荷
+    # TTPs & Malware
+    "ATTACK_PATTERN": "attack-pattern",      # Attack Pattern (TTPs, critical)
+    "MALWARE": "malware",                    # Malware
+    "TOOL": "tool",                          # Tool (Legitimate or malicious software used in attacks)
+    "PAYLOAD": "payload",                    # Payload
 
-    # 漏洞与指标 (Vulnerabilities & Indicators)
-    "VULNERABILITY": "vulnerability",        # 漏洞 (CVE 是其一个实例)
-    "INDICATOR": "indicator",                # 指标 (如 "IP 1.2.3.4 是 C2 服务器")
+    # Vulnerabilities & Indicators
+    "VULNERABILITY": "vulnerability",        # Vulnerability (CVE is an instance)
+    "INDICATOR": "indicator",                # Indicator (e.g., "IP 1.2.3.4 is C2 server")
 
-    # 应对与信息 (Response & Information)
-    "COURSE_OF_ACTION": "course-of-action",  # 应对措施 (新增)
-    "IDENTITY": "identity",                  # 身份信息
-    "LOCATION": "location",                  # 地理位置 (新增)
-    "REPORT": "report",                      # 情报报告 (新增，用于关联一组情报)
+    # Response & Information
+    "COURSE_OF_ACTION": "course-of-action",  # Course of Action (New)
+    "IDENTITY": "identity",                  # Identity Information
+    "LOCATION": "location",                  # Location (New)
+    "REPORT": "report",                      # Report (New, used to group related intelligence)
 
-    # 可观察对象 (Cyber Observables - SCOs)
-    "ARTIFACT": "artifact",                  # 文件、payload 等二进制对象
-    "FILE": "file",                          # 文件
-    "FILE_HASH": "file-hash",                # 文件哈希 (新增，用于统一管理 MD5, SHA等)
-    "IP_ADDRESS": "ipv4-addr",               # IP 地址 (STIX标准为 ipv4-addr/ipv6-addr)
-    "DOMAIN": "domain-name",                 # 域名
-    "SOFTWARE": "software",                  # 软件 (包括操作系统、中间件等)
+    # Cyber Observables (SCOs)
+    "ARTIFACT": "artifact",                  # Binary objects like files and payloads
+    "FILE": "file",                          # File
+    "FILE_HASH": "file-hash",                # File Hash (New for unified management of MD5, SHA, etc.)
+    "IP_ADDRESS": "ipv4-addr",               # IP Address (STIX standard ipv4-addr/ipv6-addr)
+    "DOMAIN": "domain-name",                 # Domain Name
+    "SOFTWARE": "software",                  # Software (OS, middleware, etc.)
 }
 
 # ==============================================================================
-# 修订后的关系类型 (参考 STIX 2.1 核心关系)
+# Revised Relationship Types (Reference STIX 2.1 Core Relationships)
 # ==============================================================================
 REVISED_STIX_RELATIONSHIPS = {
-    # 核心通用关系
-    "RELATED_TO": "related-to",              # 两个对象之间存在某种模糊的联系
+    # Core Common Relationships
+    "RELATED_TO": "related-to",              # General relationship between two objects
     
-    # 归因与从属关系
-    "ATTRIBUTED_TO": "attributed-to",        # (入侵集合) 归因于 (威胁行动者)
-    "PART_OF": "part-of",                    # A 是 B 的一部分 (新增)
-    "DERIVED_FROM": "derived-from",          # (指标) 来源于 (观察数据)
+    # Attribution & Subordination
+    "ATTRIBUTED_TO": "attributed-to",        # Attribution (e.g., Intrusion Set to Threat Actor)
+    "PART_OF": "part-of",                    # Part-of relationship (New)
+    "DERIVED_FROM": "derived-from",          # Origin relationship (e.g., Indicator from Observed Data)
     
-    # 行为与能力关系
-    "USES": "uses",                          # (威胁行动者) 使用 (恶意软件/工具/攻击模式)
-    "TARGETS": "targets",                    # (入侵集合) 瞄准 (身份/地理位置)
-    "EXPLOITS": "exploits",                  # (恶意软件) 利用 (漏洞)
-    "DELIVERS": "delivers",                  # (恶意软件) 投递 (另一个恶意软件)
+    # Behavior & Capability Relationships
+    "USES": "uses",                          # Usage (e.g., Threat Actor uses Malware/Tool/Attack Pattern)
+    "TARGETS": "targets",                    # Targeting (e.g., Intrusion Set targets Identity/Location)
+    "EXPLOITS": "exploits",                  # Exploitation (e.g., Malware exploits Vulnerability)
+    "DELIVERS": "delivers",                  # Delivery (e.g., Malware delivers another Malware)
     
-    # 指示与定位关系
-    "INDICATES": "indicates",                # (指标) 指示 (恶意软件/入侵集合)
-    "LOCATED_AT": "located-at",              # (身份) 位于 (地理位置)
+    # Indication & Positioning Relationships
+    "INDICATES": "indicates",                # Indication (e.g., Indicator indicates Malware/Intrusion Set)
+    "LOCATED_AT": "located-at",              # Location positioning (e.g., Identity located at Location)
     
-    # 网络与主机关系
-    "COMMUNICATES_WITH": "communicates-with",# (恶意软件) 与 (IP地址) 通信
-    "CONNECTS_TO": "connects-to",            # (IP地址) 连接到 (IP地址)
-    "RESOLVES_TO": "resolves-to",            # (域名) 解析到 (IP地址)
-    "HOSTS": "hosts",                        # (服务器) 托管 (恶意软件)
+    # Network & Host Relationships
+    "COMMUNICATES_WITH": "communicates-with",# Communication (e.g., Malware communicates with IP Address)
+    "CONNECTS_TO": "connects-to",            # Connection (e.g., IP Address connects to IP Address)
+    "RESOLVES_TO": "resolves-to",            # Resolution (e.g., Domain resolves to IP Address)
+    "HOSTS": "hosts",                        # Hosting (e.g., Server hosts Malware)
     
-    # 包含关系
-    "CONTAINS": "contains",                  # (报告/对象) 包含 (可观察对象)
-    "HAS_WEAKNESS": "has-weakness",          # (软件) 有 (弱点)
+    # Containment Relationships
+    "CONTAINS": "contains",                  # Inclusion (e.g., Report/Object contains Observable)
+    "HAS_WEAKNESS": "has-weakness",          # Weakness (e.g., Software has weakness)
 }
 
-# STIX2.0 实体属性关键字（通用属性）
+# STIX 2.0 Entity Property Keywords (Common Properties)
 STIX_COMMON_PROPERTIES = {
-    "ID": "id",  # 唯一标识符（如attack-pattern--xxxx）
-    "TYPE": "type",  # 实体类型（对应STIX_ENTITY_TYPES）
-    "NAME": "name",  # 实体名称
-    "DESCRIPTION": "description",  # 实体描述
-
+    "ID": "id",  # Unique identifier (e.g., attack-pattern--xxxx)
+    "TYPE": "type",  # Entity type (corresponds to STIX_ENTITY_TYPES)
+    "NAME": "name",  # Entity name
+    "DESCRIPTION": "description",  # Entity description
 }
 
-# 实体提取相关常量
+# Entity Extraction Constants
 ENTITY_EXTRACTION = {
-    "MIN_CONFIDENCE": 0.7,  # 实体提取最小置信度阈值
-    "MAX_ENTITIES_PER_DOC": 100,  # 单文档最大提取实体数
+    "MIN_CONFIDENCE": 0.7,  # Minimum confidence threshold for entity extraction
+    "MAX_ENTITIES_PER_DOC": 100,  # Maximum number of entities to extract per document
     "STIX_ENTITY_PATTERNS": {
-        # 可添加STIX实体的正则匹配模式（辅助NLP提取）
-        "VULNERABILITY": r"CVE-\d{4}-\d{4,7}",  # CVE漏洞编号模式
-        "FILE": r"[a-zA-Z0-9_]+\.(exe|dll|docx|pdf)",  # 常见文件名模式
+        # Regex patterns for STIX entities (aiding NLP extraction)
+        "VULNERABILITY": r"CVE-\d{4}-\d{4,7}",  # CVE vulnerability pattern
+        "FILE": r"[a-zA-Z0-9_]+\.(exe|dll|docx|pdf)",  # Common filename pattern
     }
-}
+}

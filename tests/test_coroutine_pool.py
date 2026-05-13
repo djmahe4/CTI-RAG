@@ -4,85 +4,85 @@ import sys
 import os
 import time
 
-# 添加项目根目录到路径
+# Add root directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rag.utils.coroutine_pool import CoroutinePool
 
 @pytest.fixture
 def coroutine_pool():
-    """创建协程池实例"""
+    """Example of creating a coroutine pool"""
     return CoroutinePool(max_workers=5)
 
 async def dummy_task(duration, return_value=None, raise_error=False):
-    """测试用的虚拟任务"""
+    """Virtual task for testing"""
     await asyncio.sleep(duration)
     if raise_error:
-        raise ValueError("测试错误")
+        raise ValueError("Test error")
     return return_value or duration
 
 @pytest.mark.asyncio
 async def test_submit_task(coroutine_pool):
-    """测试提交任务"""
-    # 提交任务
-    result = await coroutine_pool.submit(dummy_task(0.1, "测试结果"))
+    """Test task submission"""
+    # Commit Task
+    result = await coroutine_pool.submit(dummy_task(0.1, "Test Results"))
     
-    # 验证结果
-    assert result == "测试结果"
+    # Verify Results
+    assert result == "Test Results"
 
 @pytest.mark.asyncio
 async def test_concurrent_tasks(coroutine_pool):
-    """测试并发任务"""
-    # 提交多个任务
+    """Test concurrent execution"""
+    # Multiple tasks submitted
     start_time = time.time()
     tasks = [
         coroutine_pool.submit(dummy_task(0.5, i))
         for i in range(10)
     ]
     
-    # 等待所有任务完成
+    # Waiting for all tasks to be completed
     results = await asyncio.gather(*tasks)
     end_time = time.time()
     
-    # 验证结果
+    # Authentication Results
     assert results == list(range(10))
     
-    # 验证并发执行（总时间应该小于串行执行的时间）
-    # 5个工作协程，每个任务0.5秒，应该需要约1秒完成
-    assert end_time - start_time < 2.0  # 添加一些余量
+    # Validation and execution (total time should be less than the time of serial execution)
+    # 5 workshops, 0.5 seconds each, should take about one second to complete.
+    assert end_time - start_time < 2.0  # Add some surplus
 
 @pytest.mark.asyncio
 async def test_cancel_task(coroutine_pool):
-    """测试取消任务"""
-    # 提交长时间运行的任务
+    """Test Cancel"""
+    # Submit long running tasks
     async def long_task():
         try:
             await asyncio.sleep(10)
-            return "完成"
+            return "Completed"
         except asyncio.CancelledError:
-            return "已取消"
+            return "Canceled"
     
     task_id = "test_task"
     task = asyncio.create_task(coroutine_pool.submit(long_task(), task_id=task_id))
     
-    # 等待一小段时间确保任务已开始
+    # Wait a little while to make sure the mission starts.
     await asyncio.sleep(0.1)
     
-    # 取消任务
+    # Cancel Task
     result = await coroutine_pool.cancel_task(task_id)
     assert result is True
     
-    # 验证任务已从池中移除
+    # Authentication tasks removed from the pool
     assert task_id not in coroutine_pool.tasks
 
 @pytest.mark.asyncio
 async def test_error_handling(coroutine_pool):
-    """测试错误处理"""
-    # 提交会引发错误的任务
-    with pytest.raises(ValueError, match="测试错误"):
+    """Test error processing"""
+    # Submission of an error
+    with pytest.raises(ValueError, match="Test error"):
         await coroutine_pool.submit(dummy_task(0.1, raise_error=True))
     
-    # 验证任务已从池中移除
+    # Authentication tasks removed from the pool
     assert len(coroutine_pool.tasks) == 0
 
 if __name__ == "__main__":

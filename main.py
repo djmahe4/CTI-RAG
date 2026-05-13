@@ -7,7 +7,7 @@ import signal
 import sys
 import atexit
 from packages.manager.milvus_manager import get_milvus_manager
-# 导入图数据库索引器
+# Import graph database indexer
 from packages.core.graph_indexer import graph_indexer
 from rag.cache.redis_session import RedisSessionManager
 import redis
@@ -18,30 +18,30 @@ config = None
 milvus_manager = None
 
 def load_config():
-    """加载配置文件，使用UTF-8编码"""
+    """Load configuration file using UTF-8 encoding."""
     try:
         with open("./config.yaml", "r", encoding='utf-8') as f:
-            config = yaml.safe_load(f)  # 使用safe_load更安全
+            config = yaml.safe_load(f)  # Use safe_load for better security
         return config
     except UnicodeDecodeError as e:
-        print(f"配置文件编码错误: {e}")
-        print("尝试使用其他编码加载...")
+        print(f"Configuration file encoding error: {e}")
+        print("Attempting to load using alternative encoding...")
         try:
             with open("./config.yaml", "r", encoding='gbk') as f:
                 config = yaml.safe_load(f)
             return config
         except Exception as e2:
-            print(f"使用GBK编码也失败: {e2}")
+            print(f"Failed to load using GBK encoding: {e2}")
             raise
     except Exception as e:
-        print(f"加载配置文件失败: {e}")
+        print(f"Failed to load configuration file: {e}")
         raise
 
 def start_milvus():
-    """启动milvus服务器"""
+    """Start the Milvus server."""
     global milvus_manager
     if config.get("milvus", {}).get("auto_start", True):
-        print("正在启动Milvus服务器...")
+        print("Starting Milvus server...")
         milvus_config = config.get("milvus", {})
         data_dir = milvus_config.get("data_dir", "./milvus_lite")
         host = milvus_config.get("host", "milvus-standalone")
@@ -49,69 +49,69 @@ def start_milvus():
 
         milvus_manager = get_milvus_manager(data_dir, port, host)
         if milvus_manager.start():
-            print(f"✓ Milvus服务器启动成功，监听 {host}:{port}")
+            print(f"✓ Milvus server started successfully, listening on {host}:{port}")
             return True
         else:
-            print("✗ Milvus服务器启动失败")
+            print("✗ Failed to start Milvus server")
             return False
     else:
-        print("Milvus自动启动已禁用，请手动启动milvus服务器")
+        print("Milvus auto-start disabled, please start the Milvus server manually")
         return True
 
 def stop_milvus():
-    """停止milvus服务器"""
+    """Stop the Milvus server."""
     global milvus_manager
     if milvus_manager:
-        print("正在停止Milvus服务器...")
+        print("Stopping Milvus server...")
         milvus_manager.stop()
-        print("✓ Milvus服务器已停止")
+        print("✓ Milvus server stopped")
 
 def start_server(host = "0.0.0.0", port = 8000):
-    """start the fastapi server"""
-    # 延迟导入，确保在Milvus启动后再导入
+    """Start the FastAPI server."""
+    # Lazy import to ensure Milvus is started before importing
     from rag.api.server import fastapi_server
     uvicorn.run(fastapi_server, host=host, port=port, proxy_headers=True, forwarded_allow_ips='*')
 
 
 def signal_handler(sig, frame):
-    """处理信号，确保主进程结束时终止所有线程"""
-    print("接收到终止信号，正在关闭服务...")
+    """Handle signals to ensure all threads are terminated when the main process exits."""
+    print("Received termination signal, shutting down services...")
     stop_milvus()
     sys.exit(0)
 
 def check_redis():
-    """检查Redis是否已启动"""
+    """Check if Redis is running."""
     try:
         r = redis.Redis(host='redis', port=6379, db=0, socket_connect_timeout=1)
         r.ping()
-        print("Redis服务器已在运行")
+        print("Redis server is already running")
         return True
     except:
-        print("Redis服务器未启动")
+        print("Redis server is not running")
         return False
 
 if __name__ == "__main__":
-    # 注册信号处理器
+    # Register signal handlers
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    # 注册退出时的清理函数
+    # Register exit cleanup function
     atexit.register(stop_milvus)
 
     config = load_config()
 
-    # 检查Redis是否已启动
+    # Check if Redis is running
     if not check_redis():
-        print("警告: Redis服务器未启动，会话缓存将不可用")
-        print("请安装并启动Redis服务器以启用会话缓存功能")
-        print("安装指南: https://redis.io/docs/getting-started/")
+        print("Warning: Redis server is not running, session cache will be unavailable")
+        print("Please install and start the Redis server to enable session caching")
+        print("Installation guide: https://redis.io/docs/getting-started/")
 
-    # 启动Milvus服务器
+    # Start Milvus server
     if not start_milvus():
-        print("Milvus服务器启动失败，程序退出")
+        print("Failed to start Milvus server, exiting program")
         sys.exit(1)
 
-    # 启动Neo4j服务器（如果配置了自动启动）
+    # Start Neo4j server (if auto-start is configured)
     if config.get("neo4j", {}).get("auto_start", False):
         from packages.manager.neo4j_manager import start_neo4j_server
         start_neo4j_server(
@@ -121,21 +121,22 @@ if __name__ == "__main__":
             host=config.get("neo4j", {}).get("host", "neo4j")
         )
 
-    # 启动图数据库索引器（如果启用了知识图谱）
+    # Start graph database indexer (if knowledge graph is enabled)
     if config.get("enable_knowledge_graph", False):
-        # 设置索引间隔（默认1小时）
+        # Set index interval (default 1 hour)
         index_interval = config.get("neo4j", {}).get("index_interval", 3600)
         graph_indexer.interval = index_interval
         graph_indexer.start()
 
 
-    # 启动服务器（主线程）
+    # Start server (main thread)
     try:
-        print(f"正在启动FastAPI服务器，监听 {config['fastapi_server']['host']}:{config['fastapi_server']['port']}")
+        print(f"Starting FastAPI server, listening on {config['fastapi_server']['host']}:{config['fastapi_server']['port']}")
         start_server(host=config["fastapi_server"]["host"], port=config["fastapi_server"]["port"])
     except KeyboardInterrupt:
-        print("\n程序被用户中断")
+        print("\nProgram interrupted by user")
     except Exception as e:
-        print(f"服务器启动失败: {e}")
+        print(f"Server start failed: {e}")
     finally:
         stop_milvus()
+

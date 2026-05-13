@@ -1,12 +1,12 @@
 """
-这里面存放是 RAG 相关的一些组件
+It's stored here. RAG Some relevant components
 """
 
 from ..utils import prompts
 
 class BaseOperator:
     """
-    基类
+    Base Category
     """
     template = None
 
@@ -18,7 +18,7 @@ class BaseOperator:
 
     def __call__(self, **kwargs):
         """
-        所有 RAG 相关组件的调用接口
+        All RAG Call interface for relevant components
         """
         return self.call(**kwargs)
 
@@ -26,7 +26,7 @@ class BaseOperator:
 
 class HyDEOperator(BaseOperator):
     """
-    HyDE 重写查询
+    HyDE Rewrite queries
     """
     template = prompts.HYDE_PROMPT_TEMPLATE
 
@@ -36,12 +36,12 @@ class HyDEOperator(BaseOperator):
     @classmethod
     def call(cls, model_callable, query, context_str, **kwargs):
         """
-        重写查询
+        Rewrite queries
 
         Args:
-            model_callable: 模型调用函数
-            query: 查询
-            context_str: 上下文
+            model_callable: Model Call Functions
+            query: Question
+            context_str: Context
         """
         prompt = cls.template.format(query=query, context_str=context_str)
         response = model_callable(prompt)

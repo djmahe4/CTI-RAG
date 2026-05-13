@@ -9,18 +9,18 @@ from rag.mq.rabbitmq_manager import RabbitMQManager
 from rag.vector.vector_database import get_vector_database_instance
 import logging
 
-# 配置日志
+# Configure Log
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class VectorSearchWorker:
-    """向量检索工作器，处理异步检索请求"""
+    """Vector Retrieval Worker，Processing requests for helipads"""
     
     def __init__(self, num_workers: int = 3):
-        """初始化向量检索工作器
+        """Initialization vector searcher
         
         Args:
-            num_workers: 工作线程数量
+            num_workers: Number of workspaces
         """
         self.mq_manager = RabbitMQManager()
         self.vector_db = get_vector_database_instance()
@@ -29,12 +29,12 @@ class VectorSearchWorker:
         self.num_workers = num_workers
         self.workers = []
         
-        # 声明队列
+        # Declaration Queue
         self.mq_manager.declare_queue(self.search_queue)
         self.mq_manager.declare_queue(self.result_queue)
     
     def start_workers(self):
-        """启动工作线程"""
+        """Start a workspace"""
         for i in range(self.num_workers):
             worker = threading.Thread(
                 target=self._worker_thread,
@@ -43,38 +43,38 @@ class VectorSearchWorker:
             )
             worker.start()
             self.workers.append(worker)
-            logger.info(f"向量检索工作线程 {i} 已启动")
+            logger.info(f"Vector search workspace {i} Started")
     
     def _worker_thread(self, worker_id: int):
-        """工作线程函数
+        """Workline Functions
         
         Args:
-            worker_id: 工作线程ID
+            worker_id: WorkspaceID
         """
-        logger.info(f"向量检索工作线程 {worker_id} 开始运行")
+        logger.info(f"Vector search workspace {worker_id} Start running")
         
-        # 创建独立的RabbitMQ连接
+        # Create independent RabbitMQ connection
         mq = RabbitMQManager()
         
         def callback(ch, method, properties, body):
-            """消息处理回调函数"""
+            """Message Processing Retal function"""
             try:
-                # 解析消息
+                # Can not open message
                 message = json.loads(body)
-                logger.info(f"工作线程 {worker_id} 收到检索请求: {message.get('request_id')}")
+                logger.info(f"Workspace {worker_id} Retrieval requests received: {message.get('request_id')}")
                 
-                # 提取查询参数
+                # Extract query parameters
                 query = message.get("query", "")
                 k = message.get("k", 5)
                 request_id = message.get("request_id", "")
                 conversation_id = message.get("conversation_id", "")
                 
-                # 执行向量检索
+                # Execute vector search
                 start_time = time.time()
                 results = self.vector_db.query_vector_database(query)
                 search_time = time.time() - start_time
                 
-                # 格式化结果
+                # Format Results
                 formatted_results = []
                 for doc in results:
                     formatted_results.append({
@@ -82,7 +82,7 @@ class VectorSearchWorker:
                         "metadata": doc.metadata
                     })
                 
-                # 发送结果
+                # Send Results
                 result_message = {
                     "request_id": request_id,
                     "conversation_id": conversation_id,
@@ -92,36 +92,36 @@ class VectorSearchWorker:
                 }
                 
                 mq.publish_message(self.result_queue, result_message)
-                logger.info(f"工作线程 {worker_id} 完成检索请求: {request_id}, 耗时: {search_time:.2f}秒")
+                logger.info(f"Workspace {worker_id} Complete search request: {request_id}, Time consuming: {search_time:.2f}sec")
                 
-                # 确认消息
+                # Confirm message.
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             except Exception as e:
-                logger.error(f"工作线程 {worker_id} 处理消息失败: {str(e)}")
-                # 拒绝消息并重新入队
+                logger.error(f"Workspace {worker_id} Can not open message: {str(e)}")
+                # Deny the message and re-enter.
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
         
-        # 设置QoS，每次只处理一条消息
+        # Set QoS to process only one message at a time
         mq.channel.basic_qos(prefetch_count=1)
         
-        # 开始消费消息
+        # Start Consumption Message
         mq.consume_messages(self.search_queue, callback, auto_ack=False)
     
     def submit_search_task(self, query: str, conversation_id: str = None, k: int = 5) -> str:
-        """提交检索任务
+        """Submit search assignments
         
         Args:
-            query: 查询文本
-            conversation_id: 会话ID
-            k: 返回结果数量
+            query: Query Text
+            conversation_id: SessionID
+            k: Number of returns
             
         Returns:
-            str: 请求ID
+            str: RequestID
         """
-        # 生成请求ID
+        # Generate Request ID
         request_id = str(uuid.uuid4())
         
-        # 创建消息
+        # Can not open message
         message = {
             "request_id": request_id,
             "conversation_id": conversation_id,
@@ -130,8 +130,8 @@ class VectorSearchWorker:
             "timestamp": time.time()
         }
         
-        # 发布消息
+        # Send Message
         self.mq_manager.publish_message(self.search_queue, message)
-        logger.info(f"已提交检索任务: {request_id}")
+        logger.info(f"A search assignment has been submitted: {request_id}")
         
         return request_id

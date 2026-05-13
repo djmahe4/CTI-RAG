@@ -273,3 +273,32 @@ def test_build_model_router_passes_factory_through():
         assert router._factory is factory
     finally:
         asyncio.run(router.runtime_store.close())
+if __name__ == "__main__":
+    print("Running ModelRouter tests...")
+    import inspect
+
+    functions = [
+        obj for name, obj in inspect.getmembers(sys.modules[__name__])
+        if (inspect.isfunction(obj) or inspect.iscoroutinefunction(obj)) and name.startswith("test_")
+    ]
+    
+    passed = 0
+    failed = 0
+    for func in functions:
+        print(f"Running {func.__name__}...", end=" ", flush=True)
+        try:
+            if inspect.iscoroutinefunction(func):
+                asyncio.run(func())
+            else:
+                func()
+            print("PASSED")
+            passed += 1
+        except Exception as e:
+            print(f"FAILED: {e}")
+            import traceback
+            traceback.print_exc()
+            failed += 1
+            
+    print(f"\nTests complete: {passed} passed, {failed} failed.")
+    if failed > 0:
+        sys.exit(1)

@@ -28,27 +28,27 @@ pika>=1.3.2
 pymysql>=1.0.2
 sqlalchemy>=1.4.0
 
-# LlamaIndex（满足 from llama_index.core import Document）
+# LlamaIndex (Required for: from llama_index.core import Document)
 llama-index>=0.10.0
 llama-index-readers-file>=0.1.0
 
-# OCR/文件处理依赖（packages/plugins/_ocr.py 用到）
+# OCR/File processing dependencies (Used by packages/plugins/_ocr.py)
 PyMuPDF>=1.23.0
 numpy>=1.24.0
 Pillow>=9.5.0
 tqdm>=4.65.0
 rapidocr-onnxruntime>=1.3.23
 
-# MySQL 认证所需（PyMySQL caching_sha2_password）
+# Required for MySQL Authentication (PyMySQL caching_sha2_password)
 cryptography>=41.0.0
 
-# Web 搜索（修复 No module named 'tavily'）
+# Web Search (Fixes No module named 'tavily')
 tavily-python>=0.5.0
 
-# 国内大模型 SDK
+# LLM SDKs
 zhipuai>=2.1.5
 
-# 常用补充依赖（按需使用，不升级现有主依赖）
+# General utility dependencies
 aiohttp>=3.8.0
 httpx>=0.24.0
 httpx-sse>=0.4.0
@@ -63,31 +63,27 @@ xxhash>=3.4.0
 dashscope>=1.10.0
 dataclasses-json>=0.6.0
 
-# DOCX 解析（llama_index DocxReader 依赖）
+# DOCX Parsing (llama_index DocxReader dependency)
 docx2txt>=0.8.0
 
-# Excel 解析引擎（pandas read_excel 需要）
+# Excel Parsing engine (Required for pandas read_excel)
 openpyxl>=3.1.0
 
-# 认证相关
+# Authentication
 python-jose>=3.3.0
 passlib[bcrypt]>=1.7.4
 
-# # 或者替代方案
-# PyJWT>=2.6.0
-# passlib>=1.7.4
-# bcrypt>=4.0.1
-# 中文处理
+# Linguistic processing
 pypinyin>=0.48.0
 jieba>=0.42.1
 PyStemmer>=2.2.0
 
-# 模型相关
+# Model related
 safetensors>=0.4.3
 sentencepiece>=0.1.99
 tokenizers>=0.15.0
 
-# 安全/限流
+# Security/Rate Limiting
 slowapi>=0.1.9
 
-# PyTorch 由 Dockerfile 单独安装 CPU 版本，避免拉取 CUDA 相关大包
+# PyTorch is installed separately in Dockerfile to avoid CUDA bloat

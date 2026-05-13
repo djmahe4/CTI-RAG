@@ -8,32 +8,32 @@ from passlib.context import CryptContext
 
 
 class AuthUtils:
-    # 密码哈希工具
+    # Password Hash Tool
     pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-    # JWT配置
+    # JWT Configuration
     SECRET_KEY = os.getenv("JWT_SECRET_KEY", "br-chat-aision")
     ALGORITHM = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7天
+    ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
     @classmethod
     def verify_password(cls, stored_password, plain_password):
-        """验证密码"""
-        # 如果存储的密码已经是哈希值，则使用哈希验证
+        """Authentication password"""
+        # If the password stored is a Hash value, verify it with Hash
         if (stored_password.startswith("$2b$") or
             stored_password.startswith("$2a$") or
-                stored_password.startswith("$pbkdf2-sha256$")):  # 修正这里的前缀检查
+                stored_password.startswith("$pbkdf2-sha256$")):  # Fix prefix check here
             return cls.pwd_context.verify(plain_password, stored_password)
-        # 如果是明文密码（不推荐），则直接比较
+        # If explicit password (not recommended), direct comparison
         return stored_password == plain_password
 
     @classmethod
     def hash_password(cls, password):
-        """哈希密码"""
-        # 调试信息
-        print(f"密码长度: {len(password)} 字符, {len(password.encode('utf-8'))} 字节")
+        """Hash password."""
+        # Debug Information
+        print(f"Password Length: {len(password)} Character, {len(password.encode('utf-8'))} Bytes")
 
-        # 确保密码不超过72字节
+        # Make sure it doesn't exceed 72 bytes.
         password_bytes = password.encode(
             'utf-8') if isinstance(password, str) else password
         if len(password_bytes) > 72:
@@ -45,7 +45,7 @@ class AuthUtils:
 
     @classmethod
     def create_access_token(cls, data: Dict):
-        """创建访问令牌"""
+        """Create access tokens"""
         to_encode = data.copy()
         expire = datetime.utcnow() + timedelta(minutes=cls.ACCESS_TOKEN_EXPIRE_MINUTES)
         to_encode.update({"exp": expire})
@@ -55,7 +55,7 @@ class AuthUtils:
 
     @classmethod
     def decode_token(cls, token: str):
-        """解码令牌"""
+        """Decoding tokens"""
         try:
             payload = jwt.decode(token, cls.SECRET_KEY,
                                  algorithms=[cls.ALGORITHM])
@@ -65,13 +65,13 @@ class AuthUtils:
 
     @staticmethod
     def verify_access_token(token: str) -> dict[str, Any]:
-        """验证访问令牌，如果无效则抛出异常"""
+        """Authenticate access tokens，If it doesn't work, throw out the anomaly."""
         try:
-            # 修复这里，使用AuthUtils的类变量
+            # Fix here, use the AuthUtils class variable
             payload = jwt.decode(token, AuthUtils.SECRET_KEY,
                                  algorithms=[AuthUtils.ALGORITHM])
             return payload
         except jwt.ExpiredSignatureError:
-            raise ValueError("令牌已过期")
+            raise ValueError("The token expired.")
         except jwt.InvalidTokenError:
-            raise ValueError("无效的令牌")
+            raise ValueError("Invalid token")

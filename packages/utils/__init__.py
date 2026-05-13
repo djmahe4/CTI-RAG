@@ -18,17 +18,17 @@ def is_text_pdf(pdf_path):
     for page_num in range(total_pages):
         page = doc.load_page(page_num)
         text = page.get_text()
-        if text.strip():  # 检查是否有文本内容
+        if text.strip():  # Check for text contents
             text_pages += 1
 
-    # 计算有文本内容的页面比例
+    # Calculate the proportion of pages with text content
     text_ratio = text_pages / total_pages
-    # 如果超过50%的页面有文本内容，则认为是文本PDF
+    # Text is considered PDF if more than 50% of pages contain text
     return text_ratio > 0.5
 
 def hashstr(input_string, length=8, with_salt=False):
     import hashlib
-    # 添加时间戳作为干扰
+    # Add time stamp as interference
     if with_salt:
         input_string += str(time.time() + random.random())
 
@@ -38,26 +38,26 @@ def hashstr(input_string, length=8, with_salt=False):
 
 def get_project_root():
     """
-    获取项目根目录路径
-    通过查找包含特定标识文件的目录来确定项目根目录
+    Fetch the root directory path
+    Determine the root directory by searching for a directory containing a specific identification file
     """
     current_path = Path(__file__).resolve()
 
-    # 从当前文件向上查找，直到找到项目根目录的标识
-    # 项目根目录应该包含这些文件之一：.git, requirements.txt, pyproject.toml, setup.py
+    # Look up from the current file until the root directory identifier is found
+    # The root directory should contain one of these files: .git, references.txt, project.toml, setup.py
     root_indicators = ['.git', 'requirements.txt', 'pyproject.toml', 'setup.py', 'README.md']
 
     for parent in current_path.parents:
         if any((parent / indicator).exists() for indicator in root_indicators):
             return str(parent)
 
-    # 如果没有找到标识文件，返回当前文件的上两级目录（packages的父目录）
+    # If no identification file is found, return the top two-tier directory of the current file (father directory of packages)
     return str(current_path.parent.parent.parent)
 
 
 def get_docker_safe_url(base_url):
     if os.getenv("RUNNING_IN_DOCKER") == "true":
-        # 替换所有可能的本地地址形式
+        # Replace all possible local address forms
         base_url = base_url.replace("http://localhost", "http://host.docker.internal")
         base_url = base_url.replace("http://127.0.0.1", "http://host.docker.internal")
         logger.info(f"Running in docker, using {base_url} as base url")

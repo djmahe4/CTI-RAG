@@ -1,9 +1,9 @@
-"""实体候选缓存构建器
+"""Entity Cache Builder
 
-该模块负责从 Neo4j 图数据库导出实体的基础信息，并构建本地缓存文件，
-为强化学习推理模型和新图检索接口提供快速的候选实体召回能力。
+This module is responsible for from Neo4j Map database export entity base information，and build local cache files，
+Provides quick-recall capability for candidate entities to enhance learning reasoning models and new map retrieval interfaces。
 
-输出文件默认位于 `RL/cache/entity_candidates.json`，结构如下：
+Output file default at `RL/cache/entity_candidates.json`，The structure is as follows:：
 
 ```
 {
@@ -11,24 +11,24 @@
     "total": 100,
     "items": [
         {
-            "name": "示例实体",
+            "name": "Example entity",
             "type": "vulnerability",
-            "aliases": ["别名1", "别名2"],
-            "description": "实体描述",
+            "aliases": ["Alias1", "Alias2"],
+            "description": "Entity Description",
             "is_event": false,
-            "tokens": ["示例", "实体"],
-            "embedding": [...]  # 可选
+            "tokens": ["Example:", "Entities"],
+            "embedding": [...]  # Optional
         }
     ],
     "token_index": {
-        "示例": ["示例实体"],
-        "实体": ["示例实体"]
+        "Example:": ["Example entity"],
+        "Entities": ["Example entity"]
     }
 }
 ```
 
-缓存中的 token 用于倒排索引式的快速模糊召回；如果需要向量召回，可启用
-`include_embeddings=True` 将 Neo4j 节点上的向量属性直接写入缓存。
+Cache token Rapid Fuzzy Recall for Backward Indexing；If you need vector recall，Enabled
+`include_embeddings=True` Will Neo4j Vector properties on node write the cache directly。
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ from packages.utils import get_project_root
 from packages.utils.logging_config import logger
 
 
-# 尝试加载中文分词器，缺失时使用降级方案
+# Try loading the Chinese phraser, using the demotion scheme when missing
 try:
     import jieba  # type: ignore
 except Exception:  # noqa: B902
@@ -73,7 +73,7 @@ def _get_embedding_model(model_path: Optional[str] = None, device: str = "gpu"):
     try:
         from RL.utils.embedding_utils import EmbeddingModel
     except Exception as exc:  # noqa: B902
-        logger.warning(f"无法导入 EmbeddingModel，跳过实体向量计算: {exc}")
+        logger.warning(f"Could not Import EmbeddingModel，Skip Entity Vector Count: {exc}")
         _embedding_model_singleton = None
         return None
 
@@ -99,10 +99,10 @@ def _get_embedding_model(model_path: Optional[str] = None, device: str = "gpu"):
             device=resolved_device,
         )
         logger.info(
-            f"实体缓存构建器: 已加载向量模型 {model_path} (device={resolved_device})"
+            f"Entity Cache Builder: Loaded vector model {model_path} (device={resolved_device})"
         )
     except Exception as exc:  # noqa: B902
-        logger.warning(f"加载向量模型失败({model_path}): {exc}")
+        logger.warning(f"Failed to load vector model({model_path}): {exc}")
         _embedding_model_singleton = None
 
     return _embedding_model_singleton
@@ -113,13 +113,13 @@ DEFAULT_ADJACENCY_PATH = os.path.join("RL", "cache", "adjacency.json")
 
 
 def _contains_chinese(text: str) -> bool:
-    """检查文本是否包含中文字符"""
+    """Check if text contains Chinese characters"""
 
     return bool(re.search(r"[\u4e00-\u9fff]", text))
 
 
 def _normalize_aliases(raw_alias: Any) -> List[str]:
-    """将 Neo4j 中的 alias/aliases 字段归一化为字符串列表"""
+    """Will Neo4j Medium alias/aliases Fields converted to String List"""
 
     aliases: Set[str] = set()
 
@@ -148,7 +148,7 @@ def _normalize_aliases(raw_alias: Any) -> List[str]:
 
 
 def _generate_tokens(*texts: str) -> List[str]:
-    """根据名称与别名生成用于倒排索引的 token 列表"""
+    """Generation of inverted index by name and aliases token List"""
 
     token_set: Set[str] = set()
 
@@ -162,19 +162,19 @@ def _generate_tokens(*texts: str) -> List[str]:
         token_set.add(normalized)
         token_set.add(normalized.lower())
 
-        # 英文/符号按非字母数字拆分
+        # English/Symbol split by non-letter number
         for part in re.split(r"[^A-Za-z0-9]+", normalized.lower()):
             if part:
                 token_set.add(part)
 
-        # 中文分词（若可用）
+        # Chinese semiwords (if available)
         if jieba is not None and _contains_chinese(normalized):
             for token in jieba.lcut(normalized, cut_all=False):  # type: ignore[attr-defined]
                 cleaned = token.strip()
                 if cleaned:
                     token_set.add(cleaned)
         else:
-            # 简单地逐字符拆分中文，保留长度>1的片段
+            # Simplely split Chinese by character, keep a part of length >1
             chinese_parts = re.findall(r"[\u4e00-\u9fff]{2,}", normalized)
             token_set.update(chinese_parts)
 
@@ -182,32 +182,32 @@ def _generate_tokens(*texts: str) -> List[str]:
 
 
 def generate_candidate_tokens(*texts: str) -> List[str]:
-    """对外暴露的 token 生成函数"""
+    """External exposure. token Generate Functions"""
 
     return _generate_tokens(*texts)
 
 
 def _load_adjacency_metadata(adjacency_path: str) -> Dict[str, Dict[str, Any]]:
-    """加载 adjacency.json 中的节点信息，返回 {name: info} 结构"""
+    """Load adjacency.json Can not open message，Back {name: info} Structure"""
 
     if not os.path.exists(adjacency_path):
-        logger.warning(f"邻接缓存不存在: {adjacency_path}")
+        logger.warning(f"The adjacent cache does not exist: {adjacency_path}")
         return {}
 
     try:
         with open(adjacency_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
         nodes = payload.get("nodes", {}) or {}
-        logger.info(f"已从邻接缓存加载 {len(nodes)} 个节点元信息")
+        logger.info(f"Loaded from adjacent cache {len(nodes)} Node MetaInfo")
         return nodes
     except Exception as exc:  # noqa: B902
-        logger.warning(f"读取邻接缓存失败: {adjacency_path}, {exc}")
+        logger.warning(f"Reading adjacent cache failed: {adjacency_path}, {exc}")
         return {}
 
 
 @dataclass
 class EntityRecord:
-    """用于序列化的实体结构"""
+    """Physical structure for serialization"""
 
     name: str
     type: Optional[str]
@@ -232,7 +232,7 @@ class EntityRecord:
 
 
 class EntityCandidateCacheBuilder:
-    """实体候选缓存构建器"""
+    """Entity Cache Builder"""
 
     def __init__(
         self,
@@ -251,19 +251,19 @@ class EntityCandidateCacheBuilder:
             auth=(self.neo4j_user, self.neo4j_password),
         )
         logger.info(
-            f"Neo4j 连接初始化成功: uri={self.neo4j_uri}, db={self.database}"
+            f"Neo4j Connection initialised successfully: uri={self.neo4j_uri}, db={self.database}"
         )
 
         self._embedding_model = None
 
     def close(self) -> None:
-        """关闭 Neo4j 连接"""
+        """Close Neo4j Connection"""
 
         if hasattr(self, "driver") and self.driver is not None:
             self.driver.close()
 
     def fetch_entities(self, batch_size: int = 1000) -> Iterable[Dict[str, Any]]:
-        """批量获取实体信息"""
+        """Batch access to entity information"""
 
         skip = 0
         query = (
@@ -283,7 +283,7 @@ class EntityCandidateCacheBuilder:
             if not records:
                 break
 
-            logger.info(f"已获取实体 {skip + 1} ~ {skip + len(records)}")
+            logger.info(f"Entities acquired {skip + 1} ~ {skip + len(records)}")
             for record in records:
                 yield record.data()
 
@@ -295,7 +295,7 @@ class EntityCandidateCacheBuilder:
         include_embeddings: bool = False,
         adjacency_path: Optional[str] = None,
     ) -> str:
-        """构建实体候选缓存"""
+        """Build entity candidate cache"""
 
         project_root = get_project_root()
         if not output_path:
@@ -332,7 +332,7 @@ class EntityCandidateCacheBuilder:
             entity_type = entity.get("type") or "unknown"
             embedding = entity.get("embedding") if include_embeddings else None
 
-            # 兼容 adjacency.json 中的类型与事件标记
+            # Compatible type and event tags in adjaycency.json
             node_meta = adjacency_nodes.get(name, {}) if adjacency_nodes else {}
             if node_meta:
                 entity_type = node_meta.get("type", entity_type) or entity_type
@@ -354,7 +354,7 @@ class EntityCandidateCacheBuilder:
                         vector = self._embedding_model.encode_text(combined)
                         embedding = [float(v) for v in vector]
                     except Exception as exc:  # noqa: B902
-                        logger.debug(f"实体向量计算失败 {name}: {exc}")
+                        logger.debug(f"Entity vector calculation failed {name}: {exc}")
                         embedding = None
 
             tokens = _generate_tokens(name, *merged_aliases)
@@ -383,7 +383,7 @@ class EntityCandidateCacheBuilder:
         with open(output_path, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
 
-        logger.info(f"实体候选缓存已生成: {output_path}, 共 {len(items)} 条记录")
+        logger.info(f"Entity candidate cache generated: {output_path}, Total {len(items)} Notes")
         return output_path
 
 
@@ -392,7 +392,7 @@ def build_entity_candidate_cache(
     include_embeddings: bool = False,
     adjacency_path: Optional[str] = None,
 ) -> str:
-    """快捷函数：构建实体候选缓存并自动关闭连接"""
+    """Shortcuts：Build entity candidate cache and automatically close connection"""
 
     builder = EntityCandidateCacheBuilder()
     try:
@@ -406,26 +406,26 @@ def build_entity_candidate_cache(
 
 
 if __name__ == "__main__":
-    # 允许直接运行脚本生成缓存
+    # Allow running scripts directly to generate caches
     import argparse
 
-    parser = argparse.ArgumentParser(description="构建实体候选缓存")
+    parser = argparse.ArgumentParser(description="Build entity candidate cache")
     parser.add_argument(
         "--output",
         dest="output_path",
         default=None,
-        help="缓存文件输出路径（默认 RL/cache/entity_candidates.json）",
+        help="Cache File Output Path（Default RL/cache/entity_candidates.json）",
     )
     parser.add_argument(
         "--include-embeddings",
         action="store_true",
-        help="是否包含节点 embedding 向量",
+        help="Whether to include nodes embedding Vector",
     )
     parser.add_argument(
         "--adjacency",
         dest="adjacency_path",
         default=None,
-        help="邻接缓存路径（用于补充节点类型/事件标签）",
+        help="Border Cache Path（For additional node type/Event Tag）",
     )
 
     args = parser.parse_args()

@@ -1,106 +1,106 @@
 #!/bin/bash
-# NVIDIA Container Toolkit 安装脚本
-# 用于为 Docker 启用 GPU 支持
+# NVIDIA Container Toolkit installation script
+# Used to enable GPU support for Docker
 
 set -e
 
 echo "=========================================="
-echo "NVIDIA Container Toolkit 安装脚本"
+echo "NVIDIA Container Toolkit Installation Script"
 echo "=========================================="
 echo ""
 
-# 检查是否有 NVIDIA GPU
-echo "步骤 1/6: 检查 NVIDIA GPU..."
+# Check for NVIDIA GPU
+echo "Step 1/6: Checking for NVIDIA GPU..."
 if ! lspci | grep -i nvidia > /dev/null; then
-    echo "❌ 错误：未检测到 NVIDIA GPU"
-    echo "请确保您的系统有 NVIDIA 显卡"
+    echo "❌ Error: NVIDIA GPU not detected"
+    echo "Please ensure your system has an NVIDIA graphics card"
     exit 1
 fi
-echo "✓ 检测到 NVIDIA GPU"
+echo "✓ NVIDIA GPU detected"
 echo ""
 
-# 检查 NVIDIA 驱动
-echo "步骤 2/6: 检查 NVIDIA 驱动..."
+# Check NVIDIA drivers
+echo "Step 2/6: Checking NVIDIA drivers..."
 if ! nvidia-smi > /dev/null 2>&1; then
-    echo "❌ 错误：NVIDIA 驱动未安装或未正确配置"
-    echo "请先安装 NVIDIA 驱动：https://www.nvidia.com/Download/index.aspx"
+    echo "❌ Error: NVIDIA drivers not installed or not configured correctly"
+    echo "Please install NVIDIA drivers first: https://www.nvidia.com/Download/index.aspx"
     exit 1
 fi
-echo "✓ NVIDIA 驱动已安装"
+echo "✓ NVIDIA drivers are installed"
 nvidia-smi
 echo ""
 
-# 检测系统类型
-echo "步骤 3/6: 检测系统类型..."
+# Detect system type
+echo "Step 3/6: Detecting system type..."
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
     VERSION_ID=$VERSION_ID
-    echo "✓ 检测到系统: $OS $VERSION_ID"
+    echo "✓ System detected: $OS $VERSION_ID"
 else
-    echo "❌ 错误：无法检测系统类型"
+    echo "❌ Error: Unable to detect system type"
     exit 1
 fi
 echo ""
 
-# 添加 NVIDIA Container Toolkit 仓库
-echo "步骤 4/6: 添加 NVIDIA Container Toolkit 仓库..."
+# Add NVIDIA Container Toolkit repository
+echo "Step 4/6: Adding NVIDIA Container Toolkit repository..."
 distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
 
-# 添加 GPG key
+# Add GPG key
 curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | \
     sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
 
-# 添加仓库
+# Add repository
 curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list | \
     sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' | \
     sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
 
-echo "✓ 仓库添加成功"
+echo "✓ Repository added successfully"
 echo ""
 
-# 安装 NVIDIA Container Toolkit
-echo "步骤 5/6: 安装 NVIDIA Container Toolkit..."
+# Install NVIDIA Container Toolkit
+echo "Step 5/6: Installing NVIDIA Container Toolkit..."
 sudo apt-get update
 sudo apt-get install -y nvidia-container-toolkit
-echo "✓ NVIDIA Container Toolkit 安装成功"
+echo "✓ NVIDIA Container Toolkit installed successfully"
 echo ""
 
-# 配置 Docker
-echo "步骤 6/6: 配置 Docker 以使用 NVIDIA Runtime..."
+# Configure Docker
+echo "Step 6/6: Configuring Docker to use NVIDIA Runtime..."
 sudo nvidia-ctk runtime configure --runtime=docker
 sudo systemctl restart docker
-echo "✓ Docker 配置完成"
+echo "✓ Docker configuration complete"
 echo ""
 
-# 验证安装
+# Verify installation
 echo "=========================================="
-echo "验证 GPU 支持..."
+echo "Verifying GPU support..."
 echo "=========================================="
 if docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi > /dev/null 2>&1; then
-    echo "✓ GPU 支持验证成功！"
+    echo "✓ GPU support verified successfully!"
     echo ""
-    echo "Docker 现在可以使用 GPU 了"
+    echo "Docker can now use the GPU"
     docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
 else
-    echo "❌ GPU 支持验证失败"
-    echo "请检查日志并重试"
+    echo "❌ GPU support verification failed"
+    echo "Please check logs and try again"
     exit 1
 fi
 
 echo ""
 echo "=========================================="
-echo "安装完成！"
+echo "Installation complete!"
 echo "=========================================="
 echo ""
-echo "下一步："
-echo "1. 启动 Ollama GPU 版本："
+echo "Next steps:"
+echo "1. Start Ollama GPU version:"
 echo "   docker-compose up -d ollama"
 echo ""
-echo "2. 下载模型："
+echo "2. Download model:"
 echo "   docker exec -it threatrag-ollama ollama pull qwen2.5:7b"
 echo ""
-echo "3. 验证 GPU 使用："
+echo "3. Verify GPU usage:"
 echo "   docker exec threatrag-ollama nvidia-smi"
 echo ""
 

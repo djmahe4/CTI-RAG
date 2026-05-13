@@ -3,7 +3,7 @@ import uuid
 from pathlib import Path
 from argparse import ArgumentParser
 
-import fitz  # fitz就是pip install PyMuPDF
+import fitz  # Fitz is pip install pymupDF.
 import numpy as np  # Added import for numpy
 from PIL import Image
 from tqdm import tqdm
@@ -16,126 +16,126 @@ GOLBAL_STATE = {}
 
 
 class OCRPlugin:
-    """OCR 插件"""
+    """OCR Plugin"""
 
     def __init__(self, **kwargs):
         self.ocr = None
         self.det_box_thresh = kwargs.get('det_box_thresh', 0.3)
 
     def load_model(self):
-        """加载 OCR 模型"""
-        logger.info(f"加载 OCR 模型，仅在第一次调用时加载")
+        """Load OCR Model"""
+        logger.info(f"Load OCR Model，Load only on first call")
         model_dir = os.path.join(os.getenv("MODEL_DIR", ""), "SWHL/RapidOCR")
         det_model_dir = os.path.join(model_dir, "PP-OCRv4/ch_PP-OCRv4_det_infer.onnx")
         rec_model_dir = os.path.join(model_dir, "PP-OCRv4/ch_PP-OCRv4_rec_infer.onnx")
         assert os.path.exists(model_dir), (
-            f"模型文件不存在，请下载 SWHL/RapidOCR 到 {model_dir}，"
-            "并确认是否在 docker-compose.dev.yml 中添加 MODEL_DIR 环境变量"
+            f"Model file does not exist，Please download. SWHL/RapidOCR Present. {model_dir}，"
+            "and confirm whether docker-compose.dev.yml Add MODEL_DIR Environmental variables"
         )
         self.ocr = RapidOCR(det_box_thresh=0.3, det_model_path=det_model_dir, rec_model_path=rec_model_dir)
         logger.info(f"OCR Plugin for det_box_thresh = {self.det_box_thresh} loaded.")
 
     def process_image(self, image):
         """
-        对单张图像执行OCR并提取文本
+        Execute single imageOCRand extract text
 
         Args:
-            image: 图像数据，支持多种格式：
-                  - str: 图像文件路径
-                  - PIL.Image: PIL图像对象
-                  - numpy.ndarray: numpy图像数组
+            image: Image Data，Support multiple formats：
+                  - str: Image File Path
+                  - PIL.Image: PILImage Object
+                  - numpy.ndarray: numpyImage array
 
         Returns:
-            str: 提取的文本内容
+            str: Extracted text content
         """
-        # 确保模型已加载
+        # Make sure the model is loaded
         if self.ocr is None:
             self.load_model()
 
-        # 处理不同类型的输入图像
+        # Process different types of input images
         try:
             if isinstance(image, str):
-                # 图像路径直接传递给OCR处理
+                # Image path directly to OCR processing
                 image_path = image
                 is_temp_file = False
             else:
-                # 创建临时文件
+                # Create temporary file
                 is_temp_file = True
                 image_path = self._create_temp_image_file(image)
 
-            # 执行 OCR
+            # Execute OCR
             result, _ = self.ocr(image_path)
 
-            # 清理临时文件
+            # Clear temporary files
             if is_temp_file and os.path.exists(image_path):
                 os.remove(image_path)
 
-            # 提取文本
+            # Extract text
             if result:
                 text = '\n'.join([line[1] for line in result])
                 return text
             else:
-                logger.warning(f"OCR未能识别出文本内容")
+                logger.warning(f"OCRCannot recognize text content")
                 return ""
 
         except Exception as e:
-            logger.error(f"OCR处理失败: {str(e)}")
+            logger.error(f"OCRProcess failed: {str(e)}")
             raise
 
     def _create_temp_image_file(self, image):
         """
-        将图像数据保存为临时文件
+        Save image data as temporary file
 
         Args:
-            image: PIL.Image或numpy.ndarray格式的图像数据
+            image: PIL.Imageornumpy.ndarrayImage data in format
 
         Returns:
-            str: 临时文件路径
+            str: Temporary File Path
         """
-        # 为临时文件创建目录（如果不存在）
+        # Create directory for temporary files (if none exist)
         tmp_dir = os.path.join(os.getcwd(), 'tmp')
         os.makedirs(tmp_dir, exist_ok=True)
 
-        # 生成临时文件路径
+        # Generate temporary file path
         temp_filename = f'ocr_temp_{uuid.uuid4().hex[:8]}.png'
         image_path = os.path.join(tmp_dir, temp_filename)
 
-        # 根据图像类型保存文件
+        # Save files by image type
         if isinstance(image, Image.Image):
-            # 保存PIL图像对象到临时文件
+            # Save PIL Image Object to Temporary File
             image.save(image_path)
         elif isinstance(image, np.ndarray):
-            # 将numpy数组转换为PIL图像并保存
+            # Convert Numpy arrays to PIL images and save them
             Image.fromarray(image).save(image_path)
         else:
-            raise ValueError("不支持的图像类型，必须是PIL.Image或numpy数组")
+            raise ValueError("Unsupported image type，Must be.PIL.ImageornumpyArray")
 
         return image_path
 
     def process_pdf(self, pdf_path):
         """
-        处理PDF文件并提取文本
-        :param pdf_path: PDF文件路径
-        :return: 提取的文本
+        ProcessingPDFFile and extract text
+        :param pdf_path: PDFFile Path
+        :return: Extracted Text
         """
 
         if not os.path.exists(pdf_path):
             raise FileNotFoundError(f"PDF file not found: {pdf_path}")
 
         try:
-            # 检查是否为文本PDF
+            # Check for text PDF
             if is_text_pdf(pdf_path):
                 logger.info(f"PDF file is text, use llama_index.readers.file to read")
                 return pdfreader(pdf_path)
 
-            # 将PDF转换为图像
+            # Convert PDF to Image
             filename = os.path.basename(pdf_path).split('.')[0]
             output_dir = os.path.join('saves', 'data', 'pdf2txt', filename)
             os.makedirs(output_dir, exist_ok=True)
 
             images = self.convert_imgs(pdf_path, output_dir)
 
-            # 处理每个图像并合并文本
+            # Process each image and merge text
             all_text = []
             for img_path in tqdm(images, desc='to txt', ncols=100):
                 text = self.process_image(img_path)
@@ -176,19 +176,19 @@ def get_state(task_id):
 
 
 def pdfreader(file_path):
-    """读取PDF文件并返回text文本"""
+    """ReadPDFFile and ReturntextText"""
     assert os.path.exists(file_path), "File not found"
     assert file_path.endswith(".pdf"), "File format not supported"
 
     from llama_index.readers.file import PDFReader
     doc = PDFReader().load_data(file=Path(file_path))
 
-    # 简单的拼接起来之后返回纯文本
+    # Simple adjoining returns plain text
     text = "\n\n".join([d.get_content() for d in doc])
     return text
 
 def plainreader(file_path):
-    """读取普通文本文件并返回text文本"""
+    """Read normal text files and returntextText"""
     assert os.path.exists(file_path), "File not found"
 
     with open(file_path, "r") as f:

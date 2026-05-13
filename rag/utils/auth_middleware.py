@@ -9,21 +9,21 @@ from packages.manager.db_manager import db_manager
 from packages.manager.db_model import User
 from rag.utils.auth_utils import AuthUtils
 
-# 定义OAuth2密码承载器，指定token URL
+# Define OAuth2 password carrier, specify token URL
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
 
-# 公开路径列表，无需登录即可访问
+# Open Path List, access without login
 PUBLIC_PATHS = [
-    r"^/api/auth/token$",  # 登录
-    r"^/api/auth/check-first-run$",  # 检查是否首次运行
-    r"^/api/auth/initialize$",  # 初始化系统
+    r"^/api/auth/token$",  # Login
+    r"^/api/auth/check-first-run$",  # Check if first run
+    r"^/api/auth/initialize$",  # Initialization System
     r"^/api$",  # Health Check
     r"^/api/system/health$",  # Health Check
-    r"^/api/system/info$",  # 获取系统信息配置
+    r"^/api/system/info$",  # Get System Info Configuration
 ]
 
 
-# 获取数据库会话
+# Fetch database sessions
 def get_db():
     db = db_manager.get_session()
     try:
@@ -32,20 +32,20 @@ def get_db():
         db.close()
 
 
-# 获取当前用户
+# Get Current User
 async def get_current_user(token: str | None = Depends(oauth2_scheme), db: Session = Depends(get_db)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无效的凭证",
+        detail="Invalid certificate",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    # 允许无token访问公开路径
+    # No token access open path allowed
     if token is None:
         return None
 
     try:
-        # 验证token
+        # Authenticate token
         payload = AuthUtils.verify_access_token(token)
         user_id = payload.get("sub")
         if user_id is None:
@@ -53,15 +53,15 @@ async def get_current_user(token: str | None = Depends(oauth2_scheme), db: Sessi
     except JWTError:
         raise credentials_exception
     except ValueError as e:
-        # 捕获AuthUtils.verify_access_token可能抛出的ValueError
-        # 例如令牌过期或无效
+        # Capture AuthUtils.verify access tokeen may throw ValueError
+        # Like expired or invalid.
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=str(e),  # 将错误信息直接传递给客户端
+            detail=str(e),  # Send error information directly to the client End
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # 查找用户
+    # Find Users
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise credentials_exception
@@ -69,40 +69,40 @@ async def get_current_user(token: str | None = Depends(oauth2_scheme), db: Sessi
     return user
 
 
-# 获取已登录用户（抛出401如果未登录）
+# Retrieving login users (if not login)
 async def get_required_user(user: User | None = Depends(get_current_user)):
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="请登录后再访问",
+            detail="Please check in after login.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     return user
 
 
-# 获取管理员用户
+# Get Administrator Users
 async def get_admin_user(current_user: User = Depends(get_required_user)):
     if current_user.role not in ["admin", "superadmin"]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要管理员权限",
+            detail="Administrator Permissions Required",
         )
     return current_user
 
 
-# 获取超级管理员用户
+# Fetch Super Administrator Users
 async def get_superadmin_user(current_user: User = Depends(get_required_user)):
     if current_user.role != "superadmin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="需要超级管理员权限",
+            detail="Superadminister permission required",
         )
     return current_user
 
 
-# 检查路径是否为公开路径
+# Check if the path is open
 def is_public_path(path: str) -> bool:
-    path = path.rstrip("/")  # 去除尾部斜杠以便于匹配
+    path = path.rstrip("/")  # Remove tail slash to match
     for pattern in PUBLIC_PATHS:
         if re.match(pattern, path):
             return True

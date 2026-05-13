@@ -1,135 +1,135 @@
-# ThreatRAG 踩坑复盘博客设计
+# ThreatRAG Stepping on a Weblog Design
 
-## 目标
+# Target
 
-写一篇面向作者本人项目复盘的技术博客，主题聚焦 ThreatRAG 在落地过程中暴露出的三个核心问题：
+Writing a technical blog for the author's own project rediscretion, with a focus on the three core issues revealed during the landing:
 
-1. 向量数量增大后召回率下降
-2. 图召回时子图规模爆炸
-3. 图结果与向量结果难以直接统一重排序
+1. Declining recall rate after increased vector volume
+2. Demolition of the Concordat scale
+3. It is difficult to align the results directly with vector results
 
-文章目标不是写成教程或论文，而是用“真实踩坑 -> 根因定位 -> 工程修正 -> 少量结果佐证”的方式，沉淀一套更稳的 GraphRAG 实践方法。
+The aim of the article is not to be written in a curriculum or paper, but rather to settle a more stable GraphRG practice in the form of “real pedestals - > root cause - > engineering correction - > minor results”.
 
-## 目标读者
+# Target reader #
 
-- 主要读者是作者自己和对项目复盘感兴趣的工程师
-- 次级读者是做 RAG/GraphRAG 的开发者
-- 不以面试讲解或产品宣传为导向
+- The main reader is the author's own project and the project's project interest Division
+- Sub-readers are developers of RAG/ Graphrag
+- Not oriented by interview presentations or product promotion
 
-## 文章定位
+# Positioning articles
 
-- 风格：技术复盘
-- 结构：简短背景 + 按问题分类展开 + 结尾总结方法论
-- 深度：中偏深，允许介绍 Milvus filter、子图控制、摘要后重排等关键实现思路
-- 证据：使用少量指标或现象对比支撑，不做完整实验论文化展开
+- Style: Technological Duplicate
+- Structure: short background + extended by question group + end of summary methodology
+- Depth: medium depth, allowing the introduction of key realization ideas such as Milvus Filter, submap control, reordering of summary
+- Evidence: Supported by a small number of indicators or phenomena, not carried out as a whole experimental culture
 
-## 核心叙事
+# Core narrative
 
-整篇文章围绕一个主线展开：
+The article is organized around a main line:
 
-> 系统最初看起来已经具备“向量召回 + 图召回 + 重排序”的完整链路，但随着数据和图规模上升，召回质量和上下文控制问题开始集中暴露。真正的优化重点，不是继续堆模型，而是约束搜索空间、控制图上下文规模、统一异构证据的表达形式。
+> The system initially appears to have a complete chain of " vector recall + chart recall + reorder " , but as the scale of data and maps increases, recall quality and context control issues begin to be concentrated. The real focus of optimization is not to continue stacking models, but to limit the search space, the size of the context of the control map and the uniform expression of the isomer evidence.
 
-## 推荐标题
+# Recommended title
 
-优先标题：
+Priority title:
 
-《我在做 ThreatRAG 时踩过的 3 个坑：向量召回退化、子图爆炸与跨模态重排》
+"Three pits I stepped on when I was doing Threatrag: Retrieving degradation, submersible explosion and transmutation."
 
-备选标题：
+Alternative title:
 
-- 《一个 CTI GraphRAG 项目的复盘：数据一多，为什么召回反而变差了？》
-- 《从“召回越来越差”到“召回可控”：我在 ThreatRAG 里的三次修正》
+- A CTI Graphrag Project Reassembly: Why is the recall worse?
+- From "recalling" to "recallability": three amendments I made in Theratrag
 
-## 文章结构
+# Article structure
 
-### 1. 开篇背景
+1. Opening Background
 
-篇幅控制在 2 到 4 段，说明以下内容：
+The page is contained in paragraphs 2 to 4, indicating the following:
 
-- ThreatRAG 面向 CTI 场景，不是纯向量 RAG，而是向量检索、图召回、重排序、生成组合链路
-- 第一版系统在小规模数据上能工作，但问题在规模变大后出现
-- 本文不讲系统全貌，而只讲三个最典型、最影响效果的坑
+- ThreatRAG for CTI scene, not pure vector RAG, but vector search, typographical recall, reordering, generating combination links
+- The first version of the system works on small-scale data, but problems arise when the scale becomes larger
+- This is not about the full system, but about the three most typical, impacting pits.
 
-### 2. 坑一：向量变多后，召回率反而下降
+## 2. Pit One: When the vector changes, the recall rate drops
 
-固定展开顺序：
+Fixed spread order:
 
-- 初始直觉：向量更多，召回应该更稳
-- 实际现象：数据量上来后，top-k 被大量相似但无用的 chunk 占据
-- 根因分析：检索空间过大，缺少元数据约束，相关候选被噪声淹没
-- 修正方案：Milvus 在召回前使用 filter 缩小候选范围，再执行向量检索
-- 结果表达：召回结果更稳定，相关片段密度更高，误召回下降
+- Initial intuition: more vectors, more stable recall.
+- Practical phenomenon: when the data is up, the top-k is occupied by many similar but useless chunks
+- Root analysis: too much space for retrieval, lack of metadata constraints, associated candidates flooded with noise
+- Amendment: Milvus uses flyer before recall to narrow the candidate range and perform vector search
+- Outcome expression: more stable recall results, higher density of relevant clips, declining recall
 
-这一节要强调的结论：
+The conclusions highlighted in this section are:
 
-> 在知识库检索里，先约束搜索空间，往往比继续调 embedding 更有效。
+> In the search of the knowledge base, limiting the search space first is often more effective than continuing embedding.
 
-### 3. 坑二：图召回时子图爆炸
+## 3. Pit II: Retrieving T-chart blast
 
-固定展开顺序：
+Fixed spread order:
 
-- 初始做法：从命中的实体出发做多跳邻居扩展
-- 实际现象：节点和边迅速膨胀，token 暴增，很多关系虽然相邻但并不服务当前问题
-- 根因分析：图检索天然存在组合爆炸，局部连接不等于推理相关性
-- 修正方案：限制起始实体、控制 hop、限制边数，并避免把原始大子图直接送给下游
-- 结果表达：上下文规模下降，图证据仍保留关键关系
+- Initial approach: multi-jumping neighbourhood expansion from the lifeline entity
+- Physical phenomena: rapid expansion of nodes and edges, surge of token, many relationships that are adjacent but do not serve current problems
+- Root analysis: Retrieving a natural combination explosion, local connection is not the same as reasoning.
+- Amended scheme: limit the starting entity, control the hop, limit the margin and avoid sending the original large map directly downstream
+- Result expression: the size of the context is down and the evidence remains critical
 
-这一节要强调的结论：
+The conclusions highlighted in this section are:
 
-> GraphRAG 的问题很多时候不是“召不到”，而是“召太多”。
+> Graphrag is often not “failed” but “too much”.
 
-### 4. 坑三：图和向量结果难以直接重排序
+4. Pit three: it's difficult to reorder the graph and vector results directly
 
-固定展开顺序：
+Fixed spread order:
 
-- 初始做法：把文本 chunk 和图边一起丢给 reranker
-- 实际问题：文本是自然语言片段，图边是碎片化结构，二者粒度和表达形式不一致
-- 根因分析：异构证据没有先做语义对齐，直接统一打分会导致排序不稳定
-- 修正方案：先把子图转换成摘要或关系描述块，再与文本候选一起做重排序
-- 结果表达：重排结果更稳定，最终上下文更像“证据集合”而不是“结构碎片堆积”
+- Initial practice: throw text chunk with the map to reranker
+- Practical issues: Text is a natural language section, with fragmentation structures at the edge of the map, with different particle sizes and expressions
+- Root analysis: Isomer evidence is not semantically aligned first, and direct uniform scoring leads to unstable ranking
+- Amended scheme: transform the sub-chart into a summary or relationship description block and reorder it with the text candidate
+- Result expression: the result of the rearrangement is more stable and ultimately more like the “evidence collection” than the “structural debris build-up”
 
-这一节要强调的结论：
+The conclusions highlighted in this section are:
 
-> 不要让 reranker 直接面对裸图结构，先把图压成可比较的语义单元。
+> Do not let reranker face the nudity structure first by pressing it into comparable semantic units.
 
-### 5. 收尾总结
+5. Closing Summary
 
-结尾不做宏大升华，只提炼出 3 条实践原则：
+At the end of the sentence, we do not make a grand leap, but we produce three principles of practice:
 
-1. 检索前先缩小搜索空间
-2. 图召回先控规模，再谈覆盖
-3. 异构证据先统一表达，再做统一排序
+1. Reduce search space before searching
+2. Recall pre-control scale before talking about coverage
+3. Consistency of expression of isomeric evidence before uniform ranking
 
-最后补一句作者视角的复盘式总结：
+Finally, a wrap-up of the author's perspective:
 
-> 这几个坑表面看分别发生在向量检索、图召回和重排序阶段，本质上都指向同一件事：RAG 系统一旦进入真实规模，问题就不再只是“能不能召回”，而是“能不能把召回控制在可用范围内”。
+> The surface of these pits, which appear to be occurring at the vector search, recall and reordering stages respectively, points essentially to the same thing: once the RAG system has reached its true scale, the question is no longer simply “can it be called back”, but “can it be contained within the limits available”.
 
-## 写作语气
+# Writing tone
 
-- 用第一人称，强调真实试错过程
-- 多使用“我一开始以为……后来发现……”这类复盘句式
-- 避免论文腔和宣传腔
-- 不夸大收益，不写成“提出了一种先进方法”
+- In first person's name, emphasis on true trial error.
+- Use more of the words "I thought at first and found out later..." This wrapping line
+- Avoid dissertation and propaganda.
+- Don't exaggerate the gains, don't say "an advanced approach"
 
-## 证据形式
+# Forms of evidence
 
-只保留少量高价值结果：
+Only a few high-value results are retained:
 
-- 向量召回前后相关片段密度的变化
-- 子图规模或上下文长度的变化
-- 重排后最终证据质量更稳定的案例
+- Changes in the density of relevant clips before and after vector recall
+- Changes in the size of the subgraph or the length of the context
+- Reorder cases where the quality of final evidence is more stable
 
-不要求系统化实验表，但要尽量给出至少一两个前后对比，增强可信度。
+No systematic trial forms are required, but at least one or two comparisons are sought to enhance credibility.
 
-## 建议金句
+# It's a golden sentence
 
-- 数据规模变大后，召回退化很多时候不是模型不够强，而是搜索空间不够干净。
-- 图结构最危险的地方，不是信息太少，而是太容易在局部扩展里失控。
-- 重排序不是万能胶，异构证据如果不先对齐表达，分数本身就不可靠。
+- When the scale of the data has grown, many times the recall of degradation has not been sufficiently robust, but the search space has not been clean.
+- The most dangerous part of the structure is not too little information, but too easily out of control in local expansion.
+- Reordering is not an all-embracing glue, and isomer evidence is not reliable in itself if it is not presented correctly.
 
-## 非目标
+# Non-target
 
-- 不完整介绍 ThreatRAG 的全部模块
-- 不展开完整论文式实验设计
-- 不写成部署教程或 API 文档
-- 不展开所有工程细节，只保留与三个问题直接相关的实现思路
+- Incomplete presentation of all modules of ThreatRAG
+- No complete dissertation experimental design.
+- Not into deployment tutorials or API documents
+- Without all the details of the project, only the idea of realization that is directly related to the three issues is retained

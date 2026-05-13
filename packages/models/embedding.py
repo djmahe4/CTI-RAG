@@ -64,7 +64,7 @@ class BaseEmbeddingModel:
 class LocalEmbeddingModel(BaseEmbeddingModel):
     def __init__(self, config, **kwargs):
         """
-        对于本地模型，也可以在 src/static/models.private.yaml 中配置对应的 local_path 路径
+        For Local Models，It could be here. src/static/models.private.yaml Other Organiser local_path Path
 
         ```yaml
         EMBED_MODEL_INFO:
@@ -74,13 +74,13 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
                 local_path: /path/to/bge-m3
         ```
 
-        但是也要确保在 docker-compose 中映射了 MODEL_DIR 到 /models 目录
+        But make sure docker-compose We've got it. MODEL_DIR Present. /models Contents
         """
         info = config.embed_model_names[config.embed_model]
 
         self.model = config.model_local_paths.get(info["name"], info.get("local_path"))
         self.model = self.model or info["name"]
-        # 规范本地路径分隔符并补全容器内绝对路径
+        # Regulate local path separator and complete the absolute path inside the container
         if isinstance(self.model, str):
             _m = self.model.replace('\\\
 ','/')
@@ -97,10 +97,10 @@ class LocalEmbeddingModel(BaseEmbeddingModel):
                 logger.warning(f"Local model `{info['name']}` not found in `{self.model}`, using `{info['name']}`")
 
         logger.info(f"Loading local model `{info['name']}` from `{self.model}` with device `{config.device}`，"
-                    f"如果没配置任何路径的话，正常情况下会自动从 Huggingface 下载模型，如果遇到下载失败，可以尝试使用 HF_MIRROR 环境变量；"
-                    f"如果还是不行，建议手动下载到某个文件夹比如  /path/to/models/BAAI/bge-m3 目录下；"
-                    f"然后配置 src/.env 文件中的 MODEL_DIR 环境变量到 /path/to/models 目录；"
-                    f"如果是在 docker 中运行，请确保 docker-compose 文件（line 12 左右）中映射了 MODEL_DIR 到 /models 目录")
+                    f"If no path is configured，As a rule, it's automatic. Huggingface Download Model，If download fails，You can try it. HF_MIRROR Environmental variables；"
+                    f"If not,，Suggests manually downloading to a folder such as  /path/to/models/BAAI/bge-m3 Contents；"
+                    f"Then configure src/.env File MODEL_DIR Environment variable to /path/to/models Contents；"
+                    f"If it was docker Running，Make sure. docker-compose Documentation（line 12 Around）We've got it. MODEL_DIR Present. /models Contents")
 
         from FlagEmbedding import FlagModel
 

@@ -2,132 +2,132 @@
 
 [![oosmetrics](https://api.oosmetrics.com/api/v1/badge/achievement/c70211e8-67eb-4f22-8d23-62b3ffa4036d.svg)](https://oosmetrics.com/repo/Ais1on/CTI-RAG)
 
-ThreatRAG 是一个面向网络威胁情报（Cyber Threat Intelligence, CTI）的 RAG 系统。它不仅做文本问答，还把知识库检索、知识图谱、多模型路由、混合检索、会话管理和后台任务串成一套可部署的威胁情报分析后端。
+ThreatRAG is a RAG system for Cyber Threat Intelligence (CTI). It is not limited to text Q&A; it connects knowledge base retrieval, knowledge graph, multi-model routing, hybrid retrieval, session management, and background tasks into a deployable threat intelligence analysis backend.
 
-项目目标是让安全分析师能够围绕攻击组织、恶意软件、漏洞、基础设施、攻击活动等实体进行可追溯的多跳分析，而不是只返回几段相似文本。
+The goal is to enable security analysts to perform traceable multi-hop analysis around entities such as threat actors, malware, vulnerabilities, infrastructure, and attack campaigns, instead of only returning a few similar text snippets.
 
-## 核心能力
+## Core Capabilities
 
-### CTI RAG 问答
+### CTI RAG Q&A
 
-- 支持面向知识库的威胁情报问答。
-- 支持文件上传、文本分块、向量化和相似度检索。
-- 支持流式聊天接口，适合前端实时展示回答。
-- 支持通过 `meta.db_id`、`meta.model_provider`、`meta.model_name` 等参数控制知识库和模型。
+- Supports knowledge-base-oriented threat intelligence Q&A.
+- Supports file upload, text chunking, vectorization, and similarity retrieval.
+- Supports streaming chat APIs for real-time frontend rendering.
+- Supports controlling knowledge base and model selection through parameters like `meta.db_id`, `meta.model_provider`, and `meta.model_name`.
 
-### 知识图谱
+### Knowledge Graph
 
-- 从 CTI 文本中抽取实体与关系，沉淀为可查询的图结构。
-- 使用 Neo4j 存储威胁实体、关系和索引结果。
-- 提供图谱索引器启动、停止、状态查询和立即执行接口。
-- 支持文件实体抽取任务，适合把威胁报告批量转为图谱数据。
+- Extracts entities and relationships from CTI text and stores them as a queryable graph structure.
+- Uses Neo4j to store threat entities, relationships, and indexing results.
+- Provides APIs for graph indexer start, stop, status query, and immediate run.
+- Supports file-based entity extraction tasks for batch conversion of threat reports into graph data.
 
-### 混合检索
+### Hybrid Retrieval
 
-- 结合向量检索、图谱查询、查询改写和 rerank 能力。
-- 面向多跳问题时，可以把结构化关系和文本证据共同作为回答上下文。
-- 适合回答“某攻击组织使用了哪些漏洞”“某 IP 周围两跳内有哪些威胁实体”这类关系型问题。
+- Combines vector retrieval, graph queries, query rewriting, and reranking capabilities.
+- For multi-hop questions, structured relationships and text evidence can be used together as answer context.
+- Suitable for relationship-based questions like “Which vulnerabilities has a threat actor used?” or “Which threat entities are within two hops around an IP?”.
 
-### 多模型路由
+### Multi-Model Routing
 
-- 支持 OpenAI、DeepSeek、Ollama、SiliconFlow 等模型来源的接入配置。
-- 支持默认模型、回退链、请求超时、流式超时和单模型重试次数。
-- 支持模型熔断配置，便于在模型异常时降级到备用模型。
-- 聊天响应会返回路由元数据，便于判断实际使用模型和是否发生降级。
+- Supports integration with model providers such as OpenAI, DeepSeek, Ollama, and SiliconFlow.
+- Supports default model, fallback chain, request timeout, stream timeout, and retry count per model.
+- Supports model circuit breaker configuration for graceful degradation when a model fails.
+- Chat responses return routing metadata so you can verify the actual model used and whether degradation occurred.
 
-### 多会话聊天
+### Multi-Session Chat
 
-- 支持自动创建会话，也支持显式创建会话后继续对话。
-- 会话与 `user_id` 绑定，便于做用户级隔离。
-- 使用 MySQL 持久化会话和消息，使用 Redis 加速运行时读取。
-- 提供会话列表、会话详情、更新会话、删除会话和删除消息接口。
+- Supports automatic session creation and explicit session creation before continuing a conversation.
+- Sessions are bound to `user_id` for user-level isolation.
+- Uses MySQL to persist sessions and messages, and Redis to accelerate runtime reads.
+- Provides APIs for session list, session details, session update, session deletion, and message deletion.
 
-### 后台任务
+### Background Tasks
 
-- 使用 RabbitMQ 投递后台任务。
-- `threatrag-worker` 独立运行，适合处理异步任务和运行时健康检查。
-- API 镜像和 worker 镜像分离，便于生产环境独立扩缩容。
+- Uses RabbitMQ to publish background tasks.
+- `threatrag-worker` runs independently for async task handling and runtime health checks.
+- API and worker images are separated for independent scaling in production.
 
-## 系统架构
+## System Architecture
 
 ```mermaid
 flowchart LR
-    Frontend["前端 / API Client"] --> API["ThreatRAG FastAPI"]
-    API --> MySQL["MySQL\n会话与知识库元数据"]
-    API --> Redis["Redis\n运行时缓存"]
-    API --> RabbitMQ["RabbitMQ\n任务队列"]
+    Frontend["Frontend / API Client"] --> API["ThreatRAG FastAPI"]
+    API --> MySQL["MySQL\nSession and knowledge base metadata"]
+    API --> Redis["Redis\nRuntime cache"]
+    API --> RabbitMQ["RabbitMQ\nTask queue"]
     RabbitMQ --> Worker["threatrag-worker"]
-    API --> Milvus["Milvus\n向量检索"]
+    API --> Milvus["Milvus\nVector retrieval"]
     Milvus --> Etcd["Etcd"]
     Milvus --> MinIO["MinIO"]
-    API --> Neo4j["Neo4j\n知识图谱"]
-    API --> Ollama["Ollama\n本地模型"]
+    API --> Neo4j["Neo4j\nKnowledge graph"]
+    API --> Ollama["Ollama\nLocal models"]
     API --> CloudModels["OpenAI / DeepSeek / SiliconFlow"]
 ```
 
-当前 Docker Compose 部署包含：
+The current Docker Compose deployment includes:
 
-| 服务 | 作用 | 默认端口 |
+| Service | Purpose | Default Port |
 | --- | --- | --- |
-| `threatrag` | FastAPI 后端 | `8006:8000` |
-| `threatrag-worker` | 后台任务 worker | 无外部端口 |
-| `mysql` | 会话与元数据存储 | `3309:3306` |
-| `redis` | 缓存与运行时状态 | `6379:6379` |
-| `rabbitmq` | 任务队列与管理后台 | `5672:5672`, `15672:15672` |
-| `neo4j` | 知识图谱数据库 | `7475:7474`, `7688:7687` |
-| `milvus-standalone` | 向量数据库 | `19530:19530`, `9091:9091` |
-| `minio` | Milvus 对象存储依赖 | `9000:9000`, `9001:9001` |
-| `etcd` | Milvus 元数据依赖 | 容器内访问 |
-| `ollama` | 本地模型服务 | `11434:11434` |
+| `threatrag` | FastAPI backend | `8006:8000` |
+| `threatrag-worker` | Background task worker | No external port |
+| `mysql` | Session and metadata storage | `3309:3306` |
+| `redis` | Cache and runtime state | `6379:6379` |
+| `rabbitmq` | Task queue and management UI | `5672:5672`, `15672:15672` |
+| `neo4j` | Knowledge graph database | `7475:7474`, `7688:7687` |
+| `milvus-standalone` | Vector database | `19530:19530`, `9091:9091` |
+| `minio` | Object storage dependency for Milvus | `9000:9000`, `9001:9001` |
+| `etcd` | Metadata dependency for Milvus | Container-internal access |
+| `ollama` | Local model service | `11434:11434` |
 
-## 仓库结构
+## Repository Structure
 
 ```text
 ThreatRAG/
 ├── rag/
-│   ├── api/routers/        # FastAPI 路由：chat/data/graph/auth
-│   ├── cache/              # Redis 会话与运行时缓存
-│   ├── config/             # 运行时配置
-│   ├── mq/                 # RabbitMQ 发布者与 worker
-│   └── vector/             # 向量数据库相关封装
+│   ├── api/routers/        # FastAPI routers: chat/data/graph/auth
+│   ├── cache/              # Redis session and runtime cache
+│   ├── config/             # Runtime configuration
+│   ├── mq/                 # RabbitMQ publishers and workers
+│   └── vector/             # Vector database wrappers
 ├── packages/
-│   ├── core/               # 检索、知识库、图谱、实体抽取、RL 推理
-│   ├── manager/            # MySQL、Milvus、Neo4j、会话管理
-│   ├── models/             # Chat model、embedding、rerank、model router
-│   ├── plugins/            # OCR、OneKE 等插件能力
-│   └── utils/              # Prompt、日志、BM25、Web search 等工具
-├── docs/                   # API、部署、模型和研发文档
-├── tests/                  # 单元测试和运行时 wiring 测试
-├── models/                 # 本地模型与推理权重目录
-├── data/                   # Docker Compose 本地持久化数据目录
-├── Dockerfile              # API 镜像
-├── Dockerfile.worker       # Worker 镜像
-├── docker-compose.yml      # 推荐部署入口
-├── config.yaml             # 应用功能开关与本地配置
-├── main.py                 # FastAPI 本地启动入口
-└── worker.py               # Worker 本地启动入口
+│   ├── core/               # Retrieval, knowledge base, graph, entity extraction, RL reasoning
+│   ├── manager/            # MySQL, Milvus, Neo4j, session management
+│   ├── models/             # Chat model, embedding, rerank, model router
+│   ├── plugins/            # OCR, OneKE, and plugin capabilities
+│   └── utils/              # Prompt, logging, BM25, web search, and utilities
+├── docs/                   # API, deployment, model, and engineering documentation
+├── tests/                  # Unit tests and runtime wiring tests
+├── models/                 # Local models and inference weights
+├── data/                   # Local persistent data directory for Docker Compose
+├── Dockerfile              # API image
+├── Dockerfile.worker       # Worker image
+├── docker-compose.yml      # Recommended deployment entrypoint
+├── config.yaml             # Application feature flags and local config
+├── main.py                 # Local FastAPI startup entrypoint
+└── worker.py               # Local worker startup entrypoint
 ```
 
-## 快速部署
+## Quick Deployment
 
-推荐使用 Docker Compose 启动完整环境。这样会同时拉起 API、worker、MySQL、Redis、RabbitMQ、Neo4j、Milvus、MinIO、Etcd 和 Ollama。
+It is recommended to use Docker Compose to start the full environment. This brings up API, worker, MySQL, Redis, RabbitMQ, Neo4j, Milvus, MinIO, Etcd, and Ollama together.
 
-### 1. 克隆仓库
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/Ais1on/CTI-RAG.git
 cd CTI-RAG
 ```
 
-### 2. 创建 `.env`
+### 2. Create `.env`
 
-在仓库根目录创建 `.env`，至少配置你要使用的模型密钥。
+Create `.env` in the repository root and configure at least the model keys you need.
 
 ```dotenv
-# 运行环境
+# Runtime environment
 FASTAPI_ENV=production
 
-# 云端模型密钥，按需填写
+# Cloud model keys (fill as needed)
 OPENAI_API_KEY=
 DEEPSEEK_API_KEY=
 ZHIPUAI_API_KEY=
@@ -138,7 +138,7 @@ SILICONFLOW_API_BASE=https://api.siliconflow.cn/v1
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=12345678
 
-# 多模型路由
+# Multi-model routing
 MODEL_ROUTER_ENABLED=true
 MODEL_ROUTER_DEFAULT_PROVIDER=deepseek
 MODEL_ROUTER_DEFAULT_MODEL=deepseek-chat
@@ -147,7 +147,7 @@ MODEL_ROUTER_REQUEST_TIMEOUT_SECONDS=45
 MODEL_ROUTER_STREAM_TIMEOUT_SECONDS=90
 MODEL_ROUTER_MAX_RETRIES_PER_MODEL=1
 
-# 模型熔断
+# Model circuit breaker
 MODEL_CIRCUIT_BREAKER_ENABLED=true
 MODEL_CIRCUIT_BREAKER_FAILURE_THRESHOLD=5
 MODEL_CIRCUIT_BREAKER_FAILURE_WINDOW_SECONDS=60
@@ -155,62 +155,62 @@ MODEL_CIRCUIT_BREAKER_OPEN_SECONDS=120
 MODEL_CIRCUIT_BREAKER_HALF_OPEN_PROBES=2
 ```
 
-如果只使用 Ollama 本地模型，可以先不填云端模型密钥，但需要在 Ollama 容器中拉取对应模型。
+If you only use Ollama local models, cloud model keys can be left empty first, but you need to pull the required models inside the Ollama container.
 
-### 3. 构建镜像
+### 3. Build images
 
 ```bash
 docker compose build threatrag threatrag-worker
 ```
 
-### 4. 启动服务
+### 4. Start services
 
 ```bash
 docker compose up -d
 ```
 
-查看服务状态：
+Check service status:
 
 ```bash
 docker compose ps
 ```
 
-查看 API 日志：
+View API logs:
 
 ```bash
 docker compose logs -f threatrag
 ```
 
-验证 API：
+Verify API:
 
 ```bash
 curl http://localhost:8006/health
 ```
 
-预期返回：
+Expected response:
 
 ```json
 {"message":"status","status":"ok"}
 ```
 
-### 5. 拉取 Ollama 模型
+### 5. Pull Ollama models
 
-如果使用本地模型，启动后进入 Ollama 容器拉取模型：
+If using local models, enter the Ollama container after startup and pull models:
 
 ```bash
 docker exec -it threatrag-ollama ollama pull qwen3:30b
 docker exec -it threatrag-ollama ollama pull qwen2.5:7b
 ```
 
-查看模型列表：
+View model list:
 
 ```bash
 docker exec -it threatrag-ollama ollama list
 ```
 
-## 本地开发
+## Local Development
 
-本地开发建议仍然先用 Docker Compose 启动基础设施，再在宿主机运行 API。注意：`docker-compose.yml` 中的服务地址面向容器网络，宿主机直跑 `python ./main.py` 时，需要按你的环境把 Redis、MySQL、Neo4j、Milvus、Ollama 等地址调整为可访问的主机名或 `localhost` 映射端口。
+For local development, it is still recommended to start infrastructure with Docker Compose first, then run API on the host. Note: service addresses in `docker-compose.yml` target the container network; when running `python ./main.py` directly on host, adjust Redis, MySQL, Neo4j, Milvus, Ollama, etc. to reachable hostnames or `localhost` mapped ports in your environment.
 
 ```bash
 pip install -r requirements.txt
@@ -218,7 +218,7 @@ docker compose up -d mysql redis rabbitmq neo4j etcd minio milvus-standalone oll
 python ./main.py
 ```
 
-`config.yaml` 中的主要开关：
+Main flags in `config.yaml`:
 
 ```yaml
 enable_reranker: true
@@ -233,192 +233,192 @@ embed_model: "dashscope/text-embedding-v4"
 reranker: "zhipu/rerank"
 ```
 
-如果宿主机或容器没有正确挂载 GPU，可以先把 `config.yaml` 中的 `device` 和 `rl_device` 保持为 `cpu`。
+If GPU is not mounted correctly on host or container, keep `device` and `rl_device` as `cpu` in `config.yaml` first.
 
-## 常用 API
+## Common APIs
 
-API 默认通过 Docker Compose 暴露在 `http://localhost:8006`。
+By default, Docker Compose exposes APIs at `http://localhost:8006`.
 
-### 健康检查
+### Health check
 
 ```bash
 curl http://localhost:8006/health
 ```
 
-### 流式聊天
+### Streaming chat
 
-不传 `thread_id` 时会自动创建会话：
+If `thread_id` is not provided, a session is created automatically:
 
 ```bash
 curl -X POST http://localhost:8006/chat/stream \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "分析 APT29 常见攻击链",
+    "query": "Analyze common attack chains of APT29",
     "user_id": 1,
     "meta": {
-      "title": "APT 分析",
+      "title": "APT Analysis",
       "model_provider": "deepseek",
       "model_name": "deepseek-chat"
     }
   }'
 ```
 
-继续已有会话：
+Continue an existing session:
 
 ```bash
 curl -X POST http://localhost:8006/chat/stream \
   -H "Content-Type: application/json" \
   -d '{
-    "query": "这些攻击链里涉及哪些漏洞？",
+    "query": "Which vulnerabilities are involved in these attack chains?",
     "user_id": 1,
-    "thread_id": "上一轮返回的 thread_id"
+    "thread_id": "thread_id returned from previous response"
   }'
 ```
 
-### 会话管理
+### Session management
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/chat/sessions/create` | 创建会话 |
-| `GET` | `/chat/sessions` | 查询用户会话列表 |
-| `GET` | `/chat/sessions/{thread_id}` | 查询会话详情 |
-| `PUT` | `/chat/sessions/{thread_id}` | 更新会话 |
-| `DELETE` | `/chat/sessions/{thread_id}` | 删除会话 |
-| `GET` | `/chat/sessions/{thread_id}/messages` | 查询消息历史 |
-| `DELETE` | `/chat/sessions/{thread_id}/messages/{message_id}` | 删除消息 |
+| `POST` | `/chat/sessions/create` | Create session |
+| `GET` | `/chat/sessions` | List user sessions |
+| `GET` | `/chat/sessions/{thread_id}` | Get session details |
+| `PUT` | `/chat/sessions/{thread_id}` | Update session |
+| `DELETE` | `/chat/sessions/{thread_id}` | Delete session |
+| `GET` | `/chat/sessions/{thread_id}/messages` | Get message history |
+| `DELETE` | `/chat/sessions/{thread_id}/messages/{message_id}` | Delete message |
 
-### 知识库与文件
+### Knowledge base and files
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/data/upload` | 上传文件 |
-| `POST` | `/data/add-by-file` | 按文件写入知识库 |
-| `POST` | `/data/add-by-chunks` | 按文本块写入知识库 |
-| `GET` | `/data/files` | 查询文件列表 |
-| `GET` | `/data/user-knowledge-bases` | 查询用户知识库 |
-| `DELETE` | `/data/document` | 删除文档 |
+| `POST` | `/data/upload` | Upload file |
+| `POST` | `/data/add-by-file` | Write to knowledge base by file |
+| `POST` | `/data/add-by-chunks` | Write to knowledge base by text chunks |
+| `GET` | `/data/files` | List files |
+| `GET` | `/data/user-knowledge-bases` | List user knowledge bases |
+| `DELETE` | `/data/document` | Delete document |
 
-### 知识图谱
+### Knowledge graph
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/graph/info` | 查询图谱状态 |
-| `POST` | `/graph/start-indexer` | 启动图谱索引器 |
-| `POST` | `/graph/stop-indexer` | 停止图谱索引器 |
-| `GET` | `/graph/indexer-status` | 查询索引器状态 |
-| `POST` | `/graph/run-indexer-now` | 立即运行索引器 |
-| `POST` | `/graph/extract-entities-from-file` | 从文件抽取实体 |
-| `POST` | `/graph/extract-entities-task` | 创建实体抽取任务 |
-| `GET` | `/graph/extract-entities-task/status` | 查询抽取任务状态 |
-| `GET` | `/graph/extract-entities-task/result` | 查询抽取任务结果 |
+| `GET` | `/graph/info` | Query graph status |
+| `POST` | `/graph/start-indexer` | Start graph indexer |
+| `POST` | `/graph/stop-indexer` | Stop graph indexer |
+| `GET` | `/graph/indexer-status` | Query indexer status |
+| `POST` | `/graph/run-indexer-now` | Run indexer immediately |
+| `POST` | `/graph/extract-entities-from-file` | Extract entities from file |
+| `POST` | `/graph/extract-entities-task` | Create entity extraction task |
+| `GET` | `/graph/extract-entities-task/status` | Query extraction task status |
+| `GET` | `/graph/extract-entities-task/result` | Query extraction task result |
 
-### 认证与用户
+### Authentication and users
 
-| 方法 | 路径 | 说明 |
+| Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/auth/register` | 注册用户 |
-| `POST` | `/auth/token` | 登录并获取 token |
-| `GET` | `/auth/me` | 查询当前用户 |
-| `GET` | `/auth/users` | 查询用户列表 |
+| `POST` | `/auth/register` | Register user |
+| `POST` | `/auth/token` | Login and get token |
+| `GET` | `/auth/me` | Get current user |
+| `GET` | `/auth/users` | List users |
 
-更多接口说明见：
+For more API details, see:
 
-- [前端接口文档](docs/frontend-api-guide.md)
-- [聊天 API 总结](docs/chat-api-summary.md)
-- [聊天会话快速开始](docs/chat-session-quickstart.md)
-- [多模型使用指南](docs/model-usage-examples.md)
+- [Frontend API Guide](docs/frontend-api-guide.md)
+- [Chat API Summary](docs/chat-api-summary.md)
+- [Chat Session Quickstart](docs/chat-session-quickstart.md)
+- [Multi-Model Usage Guide](docs/model-usage-examples.md)
 
-## 数据持久化
+## Data Persistence
 
-Docker Compose 默认把状态数据挂载到仓库的 `data/` 目录：
+Docker Compose mounts stateful data into the repository `data/` directory by default:
 
 ```text
 data/
-├── mysql/      # MySQL 数据
-├── redis/      # Redis 数据
-├── rabbitmq/   # RabbitMQ 数据
-├── neo4j/      # Neo4j 图数据库
-├── etcd/       # Etcd 数据
-├── minio/      # MinIO 数据
-├── milvus/     # Milvus 向量数据
-└── ollama/     # Ollama 本地模型
+├── mysql/      # MySQL data
+├── redis/      # Redis data
+├── rabbitmq/   # RabbitMQ data
+├── neo4j/      # Neo4j graph database
+├── etcd/       # Etcd data
+├── minio/      # MinIO data
+├── milvus/     # Milvus vector data
+└── ollama/     # Ollama local models
 ```
 
-备份时可以整体备份 `data/`：
+For backup, you can back up the entire `data/` directory:
 
 ```bash
 tar -czf threatrag-data-backup.tar.gz data/
 ```
 
-旧版本如果使用 Docker volumes，可以参考 [数据存储说明](docs/README-volume-section.md) 中的迁移说明。
+If older versions used Docker volumes, refer to migration notes in [Data Storage Notes](docs/README-volume-section.md).
 
-## 常见问题
+## FAQ
 
-### API 启动慢
+### API starts slowly
 
-首次启动需要等待 MySQL、Redis、RabbitMQ、Neo4j、Milvus 和 Ollama 健康检查完成。可以用下面命令查看依赖状态：
+On first startup, wait for MySQL, Redis, RabbitMQ, Neo4j, Milvus, and Ollama health checks to complete. Use the following commands to check dependency status:
 
 ```bash
 docker compose ps
 docker compose logs -f threatrag
 ```
 
-### Ollama 没有可用模型
+### Ollama has no available model
 
-进入容器拉取模型：
+Enter the container and pull a model:
 
 ```bash
 docker exec -it threatrag-ollama ollama pull qwen2.5:7b
 ```
 
-然后确认 `.env` 或 `config.yaml` 中的模型名与 `ollama list` 一致。
+Then ensure the model name in `.env` or `config.yaml` matches `ollama list`.
 
-### GPU 不可用
+### GPU unavailable
 
-如果宿主机没有 NVIDIA Container Toolkit，Ollama GPU 容器可能无法正常使用。可以先使用 CPU 模式或参考脚本：
+If NVIDIA Container Toolkit is not installed on host, the Ollama GPU container may not work properly. You can use CPU mode first or run the helper script:
 
 ```bash
 bash scripts/setup-nvidia-docker.sh
 ```
 
-### Neo4j Browser 地址
+### Neo4j Browser URL
 
-Docker Compose 中 Neo4j HTTP 端口映射为 `7475:7474`，浏览器访问：
+In Docker Compose, Neo4j HTTP port mapping is `7475:7474`; access:
 
 ```text
 http://localhost:7475/browser/
 ```
 
-Bolt 地址：
+Bolt address:
 
 ```text
 bolt://localhost:7688
 ```
 
-默认账号密码：
+Default credentials:
 
 ```text
 neo4j / 12345678
 ```
 
-## 前端
+## Frontend
 
-前端项目仓库：
+Frontend repository:
 
 [https://github.com/rstarall/br-cti-chat](https://github.com/rstarall/br-cti-chat)
 
-前端对接时建议先阅读 [前端接口文档](docs/frontend-api-guide.md)，重点关注 `/chat/stream` 的逐行 JSON 流式响应和 `thread_id` 保存逻辑。
+For frontend integration, read [Frontend API Guide](docs/frontend-api-guide.md) first, especially the line-by-line JSON streaming response of `/chat/stream` and `thread_id` persistence logic.
 
-## 相关文档
+## Related Documentation
 
-- [ThreatRAG 知识图谱引入说明](chapter1-cti-kg-intro.md)
-- [聊天 API 工作流](docs/chat-api-workflow.md)
-- [聊天 API 总结](docs/chat-api-summary.md)
-- [聊天会话 API](docs/chat-session-api.md)
-- [多模型使用指南](docs/model-usage-examples.md)
-- [Ollama 配置说明](docs/ollama-setup.md)
-- [CTI RAG 面试问答](docs/cti_rag_interview_qa.md)
+- [ThreatRAG Knowledge Graph Introduction](chapter1-cti-kg-intro.md)
+- [Chat API Workflow](docs/chat-api-workflow.md)
+- [Chat API Summary](docs/chat-api-summary.md)
+- [Chat Session API](docs/chat-session-api.md)
+- [Multi-Model Usage Guide](docs/model-usage-examples.md)
+- [Ollama Setup Guide](docs/ollama-setup.md)
+- [CTI RAG Interview Q&A](docs/cti_rag_interview_qa.md)
 
-## 许可证
+## License
 
-本项目采用 MIT License，详见 [LICENSE](LICENSE)。
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.

@@ -1,72 +1,68 @@
 ---
-description: 检索系统架构和混合检索逻辑
+description: Search system architecture, four-stage hybrid retrieval logic, and BM25 filtering for CTI-RAG.
 ---
-# 检索系统架构指南
+# Search System Architecture Guide
 
-## 检索方式对比
+# Comparison of Search Approaches
 
-### 传统检索（已弃用）
-- 直接从用户问题提取实体
-- 独立执行向量检索和图检索
-- 效果较差，图查询经常失败
+## Traditional Retrieval (Legacy)
+- Directly extracts entities from user questions.
+- Performs independent vector and graph retrieval.
+- **Issue**: Highly unreliable; graph queries often fail due to lack of entity context in the query itself.
 
-### 四阶段混合检索（推荐使用）
-必须在 `meta` 中设置 `"use_hybrid_retrieval": true` 来启用
+## Four-Stage Hybrid Retrieval (Recommended)
+Enabled by setting `use_hybrid_retrieval` in the request metadata (`meta`).
 
-#### 工作原理
-1. **粗召回（向量检索）**
-   - 使用语义相似度从 Milvus 召回 top-k 文档
-   - 支持元数据过滤（日期、文件类型等）
+### Workflow
+1. **Initial Recall (Vector Search)**:
+   - Recalls the `top-k` document chunks from Milvus using semantic similarity.
+   - Supports metadata filtering (date, file type, etc.).
+2. **Entity Linking**:
+   - Extracts entities from the *recalled document chunks* (STIX format + keywords).
+   - This approach is context-aware and significantly more accurate than extraction from the raw query.
+3. **Graph Traversal (Graph Search)**:
+   - LLM generates a Cypher query using the question, extracted entities, and the Graph Schema.
+   - Supports multi-hop relationship queries (e.g., `[*..3]`).
+   - See `cypher_generation_template` in `packages/utils/prompts.py`.
+4. **Context Fusion**:
+   - Formats vector chunks and graph relationship paths into a unified context.
+   - The unified context is passed to the LLM to generate the final synthesized answer.
 
-2. **实体链接**
-   - 从召回的文档中提取实体（STIX 格式 + 关键词）
-   - 这些实体有上下文支持，比从原始问题提取更准确
+# BM25 Hybrid Search
+1. Perform vector search to obtain initial candidate results.
+2. Use these candidates to build a temporary BM25 model.
+3. Re-score the query against these candidates using BM25.
+4. Fuse vector similarity scores and BM25 scores (using configurable weights).
 
-3. **精查询（图检索）**
-   - LLM 根据问题、提取的实体和图 Schema 生成 Cypher 查询
-   - 支持多跳关系查询（如 `[*..3]`）
-   - 示例见 [cypher_generation_template](mdc:packages/utils/prompts.py)
+# Language Support
+- **English**: Uses `PyStemmer` for stemming + stopword filtering.
+- **Chinese**: Uses `jieba` for segmentation + stopword filtering.
 
-4. **上下文融合**
-   - 将向量和图结果格式化为统一上下文
-   - 交给 LLM 生成最终答案
+# Metadata Filtering
 
-## BM25 混合检索
+## Date Filtering
+Managed by `query_preprocessor.py`:
+- Extracts multiple dates (e.g., "Jan 18 and Jan 26" → `['20250118', '20250126']`).
+- Constructs OR logic filters (`date_key == '20250118' or date_key == '20250126'`).
+- Supported Formats:
+  - International: `YYYY-MM-DD`
+  - English: `Month Day, Year`
+  - Chinese: `YYYY年M月D日`, `M月D日`
 
-### 工作流程
-1. 向量检索获得初始结果
-2. 用这些文档训练 BM25 模型
-3. 对查询进行 BM25 评分
-4. 融合向量分数和 BM25 分数（可配置权重）
-
-### 语言支持
-- **中文**: 使用 `jieba` 分词 + 停用词过滤
-- **英文**: 使用 `PyStemmer` 词干提取 + 停用词过滤
-
-## 元数据过滤
-
-### 日期过滤
-[query_preprocessor.py](mdc:packages/utils/query_preprocessor.py) 支持：
-- 多日期提取（`1月18日和1月26日` → `['20250118', '20250126']`）
-- OR 逻辑过滤（`date_key == '20250118' or date_key == '20250126'`）
-- 支持格式：
-  - 中文：`YYYY年M月D日`, `M月D日`
-  - 英文：`Month Day, Year`
-  - 国际：`YYYY-MM-DD`
-
-### 静态字段
-Milvus 集合包含以下静态字段用于过滤：
+## Static Fields (Milvus)
+The Milvus collection uses the following static fields for efficient filtering:
 - `source_filename` (VARCHAR 1024)
-- `date_key` (VARCHAR 8) - YYYYMMDD 格式
+- `date_key` (VARCHAR 8) - `YYYYMMDD` format
 - `file_type` (VARCHAR 16)
 - `file_created_at` (INT64)
 
-## API 响应模式
+# API Response Modes
 
-### `/chat/hybrid-retrieval` 端点
-- `response_mode: "simple"` (默认) - 只返回答案和摘要，日志简洁
-- `response_mode: "full"` - 返回完整检索细节，用于调试
+## `/chat/hybrid-retrieval`
+- `response_mode: "simple"` (default): Returns the synthesized answer and a brief summary.
+- `response_mode: "full"`: Returns full search details, including individual chunks and graph paths, for debugging.
 
-### `/chat/stream` 端点
-- 流式返回，最后消息包含 `refs_summary`
-- 支持 Redis 会话管理
+## `/chat/stream`
+- Provides real-time token streaming.
+- The final message contains a `refs_summary` object with retrieval statistics.
+- Integrates with Redis for session management.
