@@ -225,3 +225,4 @@ chapter1-cti-kg-intro.md
 docs/
 
 *.tmp
+.free-llm-mcp/*
