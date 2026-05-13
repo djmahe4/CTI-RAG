@@ -1,4 +1,4 @@
-# 训练 / 实验型依赖，不参与默认 API 镜像构建
+# Training / Experimental dependencies, not included in default API image build
 peft>=0.7.0
 accelerate>=0.25.0
 datasets>=2.14.0
