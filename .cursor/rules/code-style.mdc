@@ -1,49 +1,49 @@
 ---
+description: Python code instruction and standards for the CTI-RAG project.
 globs: *.py
 ---
-# Python 代码规范
+# Python Code Standards
 
-## 通用规范
-- 所有注释、文档字符串和日志消息必须使用中文
-- 使用 4 空格缩进，不使用 Tab
-- 函数和类的文档字符串使用三引号 `"""`
-- 导入顺序：标准库 → 第三方库 → 项目内部模块
+# Common Norms
+- All comments, docstrings, and log messages MUST be in English.
+- Use 4 spaces for indentation (no tabs).
+- Use triple quotes `"""` for function and class docstrings.
+- Import order: standard library -> third-party libraries -> project internal modules.
 
-## 导入规范
-
-### 相对导入
+# Import Norms
+## Relative Imports
 ```python
 from .. import config
 from ..utils import logger, hashstr
 from ..models import select_model
 ```
 
-### 已修复的导入问题
-- `packages.utils.__init__.py` 必须导出：
-  ```python
-  from .bm25 import AbstractBM25
-  from .query_preprocessor import QueryPreprocessor
-  ```
+## Package Exports
+`packages.utils.__init__.py` should export common utilities:
+```python
+from .bm25 import AbstractBM25
+from .query_preprocessor import QueryPreprocessor
+```
 
-## 日志规范
+# Logging Code
 ```python
 from packages.utils.logging_config import logger
 
-# 信息日志
-logger.info(f"开始处理: {query}")
+# Information log
+logger.info(f"Started processing: {query}")
 
-# 调试日志（用于开发，不应影响生产日志）
-logger.debug(f"检索参数: {meta}")
+# Debug log (for development only)
+logger.debug(f"Retrieval parameters: {meta}")
 
-# 错误日志（包含堆栈跟踪）
-logger.error(f"检索失败: {e}, {traceback.format_exc()}")
+# Error log (includes stack trace)
+logger.error(f"Retrieval failed: {e}, {traceback.format_exc()}")
 ```
 
-## 数据库操作
+# Database Operations
 
-### Milvus
+## Milvus
 ```python
-# 创建集合时使用 create_schema
+# Use create_schema when creating collections
 schema = self.client.create_schema(
     auto_id=False,
     enable_dynamic_field=True,
@@ -51,24 +51,24 @@ schema = self.client.create_schema(
 schema.add_field(field_name="id", datatype=DataType.INT64, is_primary=True)
 # ...
 
-# 确保 file_created_at 为 int 类型
+# Ensure file_created_at is an integer
 if isinstance(static_file_created_at, float):
     static_file_created_at = int(static_file_created_at)
 ```
 
-### Neo4j
+## Neo4j
 ```python
-# 使用 with 语句管理会话
+# Use 'with' statements for session management
 with self.driver.session(database=self.kgdb_name) as session:
     return session.execute_read(query_func, params)
 
-# Cypher 查询使用参数化
+# Parameterize Cypher queries
 tx.run("MATCH (n:Entity {name: $name}) RETURN n", name=entity_name)
 ```
 
-## 异步处理
+# Async Interop
 ```python
-# 在同步函数中运行异步代码
+# Running async code in synchronous functions
 import asyncio
 import concurrent.futures
 
@@ -79,24 +79,24 @@ with concurrent.futures.ThreadPoolExecutor() as executor:
     result = future.result()
 ```
 
-## LLM Prompt 模板
-定义在 [packages/utils/prompts.py](mdc:packages/utils/prompts.py)：
-- 使用 `.format()` 方法进行变量替换
-- 包含清晰的指令和示例
-- Cypher 生成 prompt 必须包含 Schema 信息和多跳查询示例
+# LLM Prompt Templates
+Definitions should be in `packages/utils/prompts.py`:
+- Use `.format()` for variable replacement.
+- Include clear instructions and examples.
+- Cypher generation prompts must include Schema information and multi-hop query examples.
 
-## 错误处理
+# Error Management
 ```python
 try:
-    # 主要逻辑
+    # Primary logic
     result = some_operation()
 except SpecificException as e:
-    logger.error(f"具体错误描述: {e}, {traceback.format_exc()}")
-    # 优雅降级或返回错误信息
+    logger.error(f"Specific error: {e}, {traceback.format_exc()}")
+    # Graceful degradation or error response
     return {"status": "error", "message": str(e)}
 ```
 
-## 类型提示
+# Type Hints
 ```python
 from typing import Dict, List, Optional, Any
 

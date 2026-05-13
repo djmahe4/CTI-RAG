@@ -1,94 +1,93 @@
 ---
-description: 多模型集成和使用指南
+description: Guide for integrating and using multiple LLM providers and models in CTI-RAG.
 ---
-# 多模型集成指南
+# Multi-Model Integration Guide
 
-## 模型选择机制
+# Model Selection Mechanism
+The system supports multiple LLM providers through the `select_model()` function, allowing dynamic switching of models via API requests.
 
-系统通过 `select_model()` 函数支持多个 LLM 提供商，可以在 API 请求中动态切换模型。
+# Supported Model Providers
+- **openai**: Official OpenAI models (GPT-4o, GPT-4-turbo, GPT-3.5-turbo, etc.).
+- **ollama**: Local Ollama models (supports GPU acceleration).
+- **deepseek**: DeepSeek models.
+- **custom**: Custom models added through the configuration file.
+- **other**: Any OpenAI API-compatible provider.
 
-### 支持的模型提供商
-- **openai** - OpenAI 官方模型（GPT-4o, GPT-4-turbo, GPT-3.5-turbo 等）
-- **ollama** - 本地 Ollama 模型（支持 GPU 加速）
-- **deepseek** - DeepSeek 模型
-- **custom** - 自定义模型（通过配置文件添加）
-- **其他** - 任何兼容 OpenAI API 格式的提供商
+# Model Configuration
+- **Global Configuration**: `config.yaml` or environment variables.
+- **Custom Models**: Defined in the `custom_models` list within the configuration.
 
-### 模型配置位置
-- 全局配置: `config.yaml` 或环境变量
-- 自定义模型: `config.custom_models` 列表
+# API Usage Examples
 
-## API 使用方式
-
-### 方式1：使用全局默认模型
-```python
-# 不指定 model_provider 和 model_name
+## Method 1: Using Global Default Model
+```json
+// Omit model_provider and model_name
 {
-    "query": "你的问题",
+    "query": "Analyze this threat pattern.",
     "meta": {
-        "db_id": "kb_xxx"
+        "db_id": "kb_threat_intel"
     }
 }
 ```
 
-### 方式2：指定模型提供商
-```python
+## Method 2: Specifying a Provider and Model
+```json
 {
-    "query": "你的问题",
+    "query": "Summarize the attack chain.",
     "meta": {
-        "db_id": "kb_xxx",
+        "db_id": "kb_threat_intel",
         "model_provider": "deepseek",
         "model_name": "deepseek-chat"
     }
 }
 ```
 
-### 方式3：使用自定义模型
-```python
+## Method 3: Using a Custom Model
+```json
 {
-    "query": "你的问题",
+    "query": "Classify this sample.",
     "meta": {
-        "db_id": "kb_xxx",
+        "db_id": "kb_malware",
         "model_provider": "custom",
         "model_name": "my-custom-model-id"
     }
 }
 ```
 
-## 支持多模型的 API 端点
+# API Endpoints Supporting Multiple Models
 
-### `/chat/stream` (流式聊天)
-```python
+## `/chat/stream` (Streaming Chat)
+```json
 POST /chat/stream
 {
-    "query": "分析这个威胁",
+    "query": "Analyze this vulnerability.",
     "meta": {
-        "model_provider": "deepseek",  # 可选
-        "model_name": "deepseek-chat",  # 可选
-        "db_id": "kb_xxx",
+        "model_provider": "openai",
+        "model_name": "gpt-4o",
+        "db_id": "kb_vuln_database",
         "use_graph": true
     }
 }
 ```
 
-### `/chat/hybrid-retrieval` (四阶段检索)
-```python
+## `/chat/hybrid-retrieval` (Four-stage Retrieval)
+```json
 POST /chat/hybrid-retrieval
 {
-    "query": "综合分析",
+    "query": "Comprehensive analysis of APT41.",
     "meta": {
         "model_provider": "custom",
-        "model_name": "my-model",
-        "db_id": "kb_xxx"
+        "model_name": "my-local-model",
+        "db_id": "kb_apt_intel"
     },
-    "response_mode": "simple"  # 或 "full"
+    "response_mode": "simple" // or "full"
 }
 ```
 
-## 添加新模型
+# Adding a New Model Provider
 
-### 1. 添加兼容 OpenAI API 的模型
-在 `config.yaml` 中配置：
+## 1. OpenAI-Compatible Provider
+Configure in `config.yaml`:
 ```yaml
 model_names:
   my_provider:
@@ -98,103 +97,38 @@ model_names:
     env: ["MY_API_KEY"]
 ```
 
-### 2. 添加自定义模型
-在 `config.custom_models` 中添加：
+## 2. Custom Model Configuration
+Add to `custom_models` in your config:
 ```yaml
 custom_models:
   - custom_id: "my-custom-model"
     base_url: "https://api.custom.com"
-    api_key: "your-key"
+    api_key: "your-api-key"
     model_name: "actual-model-name"
 ```
 
-### 3. 实现专用模型类
-在 `packages/models/chat_model.py` 中添加：
+## 3. Implementing a New Provider Class
+If the provider requires custom logic, add it to `packages/models/chat_model.py`:
 ```python
 class MyCustomProvider:
     def __init__(self, model_name):
         self.model_name = model_name
-        # 初始化逻辑
+        # Initialization logic
     
     def predict(self, messages, stream=False):
-        # 实现预测逻辑
+        # Implementation logic
         pass
 ```
+Then update `select_model()` to route to your new class.
 
-然后在 `select_model()` 中添加分支：
-```python
-if model_provider == "my_provider":
-    from .chat_model import MyCustomProvider
-    return MyCustomProvider(model_name)
-```
+# Important Considerations
+1. **API Key Management**: Store API keys in environment variables; avoid hard-coding.
+2. **Model Compatibility**: Ensure the model supports required features (e.g., streaming output).
+3. **Error Handling**: Implement graceful fallbacks if model calls fail.
+4. **Logging**: Log model usage details (provider and name) to facilitate debugging.
 
-## 模型响应格式
-
-所有模型必须返回包含以下属性的对象：
-- `content` (str) - 生成的文本内容
-- `model_name` (str) - 模型名称
-- 流式模式下需要支持迭代器
-
-## 注意事项
-
-1. **API Key 管理**: 使用环境变量存储 API Key，不要硬编码
-2. **模型兼容性**: 确保模型支持所需的功能（如流式输出）
-3. **错误处理**: 模型调用失败时应有优雅的降级处理
-4. **日志记录**: 记录使用的模型信息，便于追踪和调试
-
-## 示例：切换到不同模型
-
-### 使用 OpenAI GPT-4
-```python
-{
-    "query": "深度分析这个复杂的 APT 攻击模式",
-    "meta": {
-        "model_provider": "openai",
-        "model_name": "gpt-4o",
-        "db_id": "kb_threat"
-    }
-}
-```
-
-### 使用 Ollama 本地模型
-```python
-{
-    "query": "分析这个日志文件",
-    "meta": {
-        "model_provider": "ollama",
-        "model_name": "qwen2.5:7b",  # 中文场景推荐
-        "db_id": "kb_logs"
-    }
-}
-```
-
-### 使用 DeepSeek 进行推理任务
-```python
-{
-    "query": "推理攻击链路径",
-    "meta": {
-        "model_provider": "deepseek",
-        "model_name": "deepseek-chat",
-        "db_id": "kb_threat"
-    }
-}
-```
-
-### 使用自定义模型
-```python
-{
-    "query": "快速分类这个样本",
-    "meta": {
-        "model_provider": "custom",
-        "model_name": "local-llama",
-        "db_id": "kb_malware"
-    }
-}
-```
-
-## 性能优化建议
-
-- **模型缓存**: 相同配置的模型实例可以复用
-- **并发控制**: 使用协程池限制并发模型调用
-- **超时设置**: 为模型调用设置合理的超时时间
-- **降级策略**: 主模型失败时自动切换到备用模型
+# Performance Optimization
+- **Model Caching**: Reuse model instances with the same configuration.
+- **Concurrency Control**: Use coroutine pools to limit concurrent model requests.
+- **Timeouts**: Set reasonable timeout thresholds for model API calls.
+- **Fallback Policy**: Automatically switch to secondary models if the primary one is unavailable.

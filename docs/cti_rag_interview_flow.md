@@ -1,125 +1,125 @@
-# CTI-RAG 面试讲解（完整回答版）
+# CTI-RAG Interview Presentation (Complete Answer Version)
 
-## 一、项目总览（1 分钟）
-我做的是一个面向网络威胁情报（CTI）问答的 GraphRAG 系统，主链路是：
+## I. Project Overview (1 minute)
+I have built a GraphRAG system tailored for Cyber Threat Intelligence (CTI) question-answering. The main pipeline consists of:
 
-`向量召回 + 图谱召回 + 强化学习边级剪枝 + 大模型生成`
+`Vector Retrieval + Graph Retrieval + Reinforcement Learning Edge Pruning + LLM Generation`
 
-目标不是单纯追求压缩，而是在**不明显损失答案效果**前提下，减少上下文噪声和推理成本。最终在我的实验中，平均子图规模从 `14.12` 降到 `6.50`（下降 `53.96%`），平均 token 从 `4936.24` 降到 `2564.71`（下降 `48.04%`）。
-
----
-
-## 二、核心流程（3 分钟）
-
-### 1) 请求进入系统
-用户问题进入 FastAPI 服务，先进行参数校验、限流与 request_id 生成，便于全链路追踪。
-
-### 2) 检索阶段
-先做向量召回拿到语义相关候选，再从图数据库中抽取对应 K-hop 子图，形成候选证据图。
-
-### 3) RL 剪枝阶段
-把候选子图输入 RL 剪枝模型，逐边判断保留/删除，得到更紧凑的“高价值子图”。
-
-### 4) 生成阶段
-将剪枝后子图转成结构化上下文，送入 LLM（通过统一 Gateway）生成答案。
-
-### 5) 回写与评测
-返回答案的同时记录关键指标（token、时延、保留率、F1/F2、失败重试等），用于离线分析和阈值调优。
+The goal is not just to compress the input, but to reduce context noise and inference costs without significantly compromising answer quality. In my experiments, the average subgraph size was reduced from `14.12` to `6.50` (a `53.96%` decrease), and the average tokens decreased from `4936.24` to `2564.71` (a `48.04%` decrease).
 
 ---
 
-## 三、四个高频面试问题（完整答法）
+## II. Core Workflow (3 minutes)
 
-## 1. 为什么能降 token？
-不是靠“粗暴截断文本”，而是通过 RL 对**边级信息价值**做决策。系统先召回候选子图，再让模型判断哪些边对当前 query 的推理链路最有帮助，保留高价值边，删掉冗余和噪声边。
+### 1) Request Ingestion
+User queries enter the FastAPI service, where they undergo parameter validation, rate limiting, and `request_id` generation for full-chain tracing.
 
-本质上把输入从“邻居堆砌”变成“目标导向的证据子图”。所以 token 下降是结构性优化结果，不是把内容简单砍短。这也是为什么压缩后仍能保持答案质量。
+### 2) Retrieval Phase
+Semantic retrieval is performed first via vector search to obtain relevant candidates. Then, the corresponding K-hop subgraphs are extracted from the graph database to form a candidate evidence graph.
 
-我在项目里看的是双指标：
-- 结构侧：子图规模、边保留率
-- 答案侧：F1/F2/Exact、答案级正确率
+### 3) RL Pruning Phase
+The candidate subgraph is fed into an RL pruning model, which makes edge-level keep/delete decisions to produce a more compact "high-value subgraph."
 
-只有双侧都过线，才认为“降 token 成功”。
+### 4) Generation Phase
+The pruned subgraph is converted into a structured context and sent to the LLM (via a unified Gateway) to generate the final answer.
 
-## 2. 怎么保证不把关键信息剪掉？
-我用了“训练约束 + 推理保护 + 离线校准”三层策略。
-
-### 训练约束
-奖励函数不只优化压缩率，还联合结构命中和语义相关性，终局奖励里加入 F2（偏召回），防止模型为了压缩过度删边。
-
-### 推理保护
-线上推理设置保护策略：
-- 最小保留比例（避免剪成空图）
-- 关键节点保护（起始节点、目标类型节点）
-- 低置信度回退（规则剪枝 / 放宽阈值）
-
-### 离线校准
-做阈值扫描与消融实验，选“答案效果-压缩率”的平衡点，而不是只追求压缩率最大化。
-
-一句话总结：先保真，再压缩。
-
-## 3. 高并发下如何稳定？
-核心做法是“同步轻编排 + 异步重计算”。
-
-### 架构拆分
-- API 主线程只做轻量编排
-- 重任务（向量化、子图构建、批量评测）走 RabbitMQ + Worker
-
-### 稳定性策略
-- Redis 缓存热点 query，减少重复计算
-- 分布式锁防缓存击穿
-- 幂等键防重复执行
-- 请求超时与队列上限，避免堆积雪崩
-
-### 资源保护
-RL 推理服务独立部署，限制并发推理数，必要时做微批处理；当系统压力过大时触发降级策略，优先保可用性。
-
-## 4. 模型服务抖动怎么办？
-通过统一 LLM Gateway 做治理，不让业务代码直接耦合具体模型。
-
-### Gateway 能力
-- 多模型路由（主模型 + 备模型）
-- 超时控制
-- 重试退避
-- 熔断与半开探测
-- 自动降级
-
-### 错误处理原则
-- 可重试错误（超时、限流、5xx）走指数退避重试
-- 不可重试错误（参数错误）快速失败
-- 主模型异常时自动切备模型，保证服务连续性
-
-目标是“质量可降级，服务不掉线”。
+### 5) Feedback and Evaluation
+While returning the answer, the system records key metrics (tokens, latency, retention rate, F1/F2, retry failures, etc.) for offline analysis and threshold tuning.
 
 ---
 
-## 四、强化学习剪枝会不会在高访问下崩溃？
-会有风险，但可以工程化规避。关键是把 RL 剪枝当“可降级组件”，不是单点依赖。
+## III. Four High-Frequency Interview Questions
 
-我会这样做：
-1. RL 剪枝服务独立部署，和 API 线程隔离。  
-2. 模型进程预热，避免每次请求加载权重。  
-3. GPU 并发限制 + 队列上限，控制显存峰值。  
-4. 失败回退到规则剪枝或保守阈值方案。  
-5. 监控队列长度、P95、OOM、超时率、降级率。  
+### 1. Why can it reduce tokens?
+It doesn't rely on "clumsy text truncation," but rather on RL to make decisions based on **edge-level information value**. The system recalls the candidate subgraph, and then the model determines which edges are most helpful for the current query's reasoning chain, retaining high-value edges and deleting redundant or noisy ones.
 
-这样即使 RL 短时不可用，系统也能继续回答，只是压缩效果下降，不会整体崩溃。
+Essentially, it transforms the input from a "neighbor stack" into a "goal-oriented evidence subgraph." Therefore, the token reduction is a result of structural optimization, not simple shortening. This is why the answer quality remains stable after compression.
+
+I track dual metrics:
+- Structural side: Subgraph size, edge retention rate.
+- Answer side: F1/F2/Exact Match, answer-level accuracy.
+
+A reduction is only considered successful if both sides meet the criteria.
+
+### 2. How do you ensure critical information isn't pruned?
+I use a three-layer strategy: "Training Constraints + Inference Protection + Offline Calibration."
+
+#### Training Constraints
+The reward function doesn't just optimize the compression rate; it also incorporates structural hits and semantic relevance. F2 (favoring recall) is added to the final reward to prevent the model from over-pruning for the sake of compression.
+
+#### Inference Protection
+Online inference uses protection policies:
+- Minimum retention ratio (prevents pruning into an empty graph).
+- Key node protection (e.g., starting nodes, target type nodes).
+- Low-confidence fallback (e.g., rule-based pruning or loosening thresholds).
+
+#### Offline Calibration
+Threshold scanning and ablation experiments are performed to find the optimal "Answer Quality vs. Compression Rate" balance point.
+
+Summary: **Fidelity first, compression second.**
+
+### 3. How do you handle stability under high concurrency?
+The core approach is "Synchronous Light Orchestration + Asynchronous Heavy Computation."
+
+#### Architecture Decoupling
+- The API main thread only performs lightweight orchestration.
+- Heavy tasks (vectorization, subgraph construction, batch evaluation) are handled via RabbitMQ + Workers.
+
+#### Stability Strategies
+- Redis caches hotspot queries to reduce redundant computation.
+- Distributed locks prevent cache breakdown.
+- Idempotency keys prevent duplicate execution.
+- Request timeouts and queue limits prevent "avalanche" effects.
+
+#### Resource Protection
+The RL inference service is deployed independently with concurrency limits and micro-batching. If system load is too high, a fallback strategy prioritizes availability.
+
+### 4. What if the model service fluctuates?
+Governance is managed through a unified LLM Gateway, ensuring business logic isn't directly coupled to specific models.
+
+#### Gateway Capabilities
+- Multi-model routing (Primary + Standby).
+- Timeout control.
+- Retry with backoff.
+- Circuit breaking and half-open detection.
+- Automatic fallback.
+
+#### Error Handling Principles
+- Retryable errors (timeouts, rate limits, 5xx) use exponential backoff.
+- Non-retryable errors (invalid parameters) fail fast.
+- Standby models are automatically triggered if the primary model fails.
+
+Goal: **"Degradable quality, non-interruptible service."**
 
 ---
 
-## 五、常见追问（简洁版）
+## IV. Will RL Pruning Collapse Under High Traffic?
+There is a risk, but it can be mitigated through engineering. The key is treating RL pruning as a "degradable component" rather than a single point of failure.
 
-### Q1：为什么不用纯向量 RAG？
-CTI 问答大量依赖多跳关系和实体路径，纯向量召回缺乏结构约束，解释性弱。图谱召回 + 剪枝可以显式保留攻击链路证据。
+Mitigation strategies:
+1. Independent deployment of RL pruning services, isolated from the API thread.
+2. Model process pre-warming to avoid loading weights on every request.
+3. GPU concurrency limits + queue caps to control memory peaks.
+4. Fallback to rule-based pruning or conservative threshold schemes on failure.
+5. Monitoring queue length, P95 latency, OOM, timeout rates, and fallback rates.
 
-### Q2：你的核心贡献是什么？
-1) 端到端链路落地；2) RL 剪枝上线化；3) 异步任务、缓存、网关治理三项工程增强。
-
-### Q3：怎么证明优化有效？
-不是只看单一准确率，而是看结构侧+答案侧+成本侧联合指标：
-`保留率 / 子图规模 / token / 时延 / F1 / Exact`。
+This ensures that even if RL is temporarily unavailable, the system continues to function (albeit with lower compression efficiency) without collapsing.
 
 ---
 
-## 六、30 秒收尾话术
-我把 CTI 场景的 RAG 从“能回答”做成了“可控可扩展”的系统：通过图谱召回 + RL 边级剪枝，显著降低上下文成本，同时用异步任务、缓存和模型网关保证高并发下的稳定性与可用性。
+## V. Common Follow-up Questions
+
+### Q1: Why not use pure vector RAG?
+CTI Q&A relies heavily on multi-hop relationships and entity paths. Pure vector retrieval lacks structural constraints and provides poor interpretability. Graph retrieval + pruning explicitly preserves attack chain evidence.
+
+### Q2: What is your core contribution?
+1) Implementation of an end-to-end pipeline; 2) Deployment of online RL pruning; 3) Engineering enhancements in asynchronous tasks, caching, and gateway governance.
+
+### Q3: How do you prove the optimization is effective?
+I look at combined metrics across Structural, Answer, and Cost dimensions:
+`Retention Rate / Subgraph Size / Tokens / Latency / F1 / Exact Match`.
+
+---
+
+## VI. 30-Second Closing Statement
+I have transformed CTI-based RAG from a simple "answering" tool into a "controllable and scalable" system. By utilizing graph retrieval and RL-based edge pruning, I significantly reduced context costs while ensuring stability and availability under high concurrency through asynchronous tasks, caching, and a robust model gateway.
