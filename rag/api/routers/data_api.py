@@ -16,10 +16,10 @@ from packages.core.graph_indexer import graph_indexer
 
 data = APIRouter(prefix="/data")
 
-# 任务状态存入Redis
+# Task status in Redis
 _redis_task_manager = RedisSessionManager(
     redis_url=os.getenv("REDIS_URL", "redis:6379"),
-    expire_time=int(os.getenv("TASK_EXPIRE_TIME", "86400"))  # 任务状态保留1天
+    expire_time=int(os.getenv("TASK_EXPIRE_TIME", "86400"))  # Keep task status 1 day
 )
 
 
@@ -28,8 +28,8 @@ async def get_databases():
     try:
         database = knowledge_base.get_databases()
     except Exception as e:
-        logger.error(f"获取数据库列表失败 {e}, {traceback.format_exc()}")
-        return {"message": "获取数据库列表失败，请稍后重试", "databases": []}
+        logger.error(f"Failed to fetch database list {e}, {traceback.format_exc()}")
+        return {"message": "Failed to fetch database list，Please try again later.", "databases": []}
     return database
 
 
@@ -38,7 +38,7 @@ async def create_database(
     database_name: str = Body(...),
     description: str = Body(...),
     dimension: Optional[int] = Body(None),
-    user_id: str = Body(...)  # 添加user_id参数
+    user_id: str = Body(...)  # Add user id parameter
 ):
     logger.debug(f"Create database {database_name}")
     try:
@@ -49,8 +49,8 @@ async def create_database(
             user_id=user_id
         )
     except Exception as e:
-        logger.error(f"创建数据库失败 {e}, {traceback.format_exc()}")
-        return {"message": "创建数据库失败，请稍后重试", "status": "failed"}
+        logger.error(f"Failed to create database {e}, {traceback.format_exc()}")
+        return {"message": "Failed to create database，Please try again later.", "status": "failed"}
     return database_info
 
 
@@ -58,7 +58,7 @@ async def create_database(
 async def delete_database(db_id):
     logger.debug(f"Delete database {db_id}")
     knowledge_base.delete_database(db_id)
-    return {"message": "删除成功"}
+    return {"message": "Delete successful"}
 
 
 @data.post("/query-test")
@@ -80,21 +80,21 @@ async def file_to_chunk(files: List[str] = Body(...), params: dict = Body(...)):
 async def create_document_by_file(db_id: str = Body(...), files: List[str] = Body(...)):
     logger.debug(f"Add document in {db_id} by file: {files}")
     try:
-        # 使用线程池执行耗时操作
+        # Time-consuming operation using a thread pool
         loop = asyncio.get_event_loop()
         await loop.run_in_executor(
-            executor,  # 使用与chat_router相同的线程池
+            executor,  # Use the same thread pool as chat router
             lambda: knowledge_base.add_files(db_id, files)
         )
-        return {"message": "文件添加完成", "status": "success"}
+        return {"message": "File Add Completed", "status": "success"}
     except Exception as e:
-        logger.error(f"添加文件失败: {e}, {traceback.format_exc()}")
-        return {"message": "添加文件失败，请稍后重试", "status": "failed"}
+        logger.error(f"Failed to add file: {e}, {traceback.format_exc()}")
+        return {"message": "Failed to add file，Please try again later.", "status": "failed"}
 
 
 @data.post("/add-by-chunks")
 async def add_by_chunks(db_id: str = Body(...), file_chunks: dict = Body(...)):
-    """将分块入库改为异步任务：立即返回200 + task_id，后台入队处理"""
+    """Renumber the breakout library as a walker：Return Now200 + task_id，Backstage in line."""
     task_id = str(uuid.uuid4())
     redis = await _redis_task_manager._get_redis()
     await redis.set(
@@ -112,18 +112,18 @@ async def add_by_chunks(db_id: str = Body(...), file_chunks: dict = Body(...)):
             )
             await redis.set(
                 f"task:{task_id}",
-                json.dumps({"status": "success", "message": "分块添加完成"}),
+                json.dumps({"status": "success", "message": "Block Add Completed"}),
                 ex=_redis_task_manager.expire_time
             )
         except Exception as e:
-            logger.error(f"添加分块失败: {e}, {traceback.format_exc()}")
+            logger.error(f"Failed to add segment: {e}, {traceback.format_exc()}")
             await redis.set(
                 f"task:{task_id}",
                 json.dumps({"status": "failed", "message": str(e)}),
                 ex=_redis_task_manager.expire_time
             )
 
-    # 后台执行任务
+    # Backstage.
     asyncio.create_task(_worker())
 
     return JSONResponse(status_code=200, content={"task_id": task_id, "status": "queued"})
@@ -150,7 +150,7 @@ async def get_database_info(db_id: str):
 async def delete_document(db_id: str = Body(...), file_id: str = Body(...)):
     logger.debug(f"DELETE document {file_id} info in {db_id}")
     knowledge_base.delete_file(db_id, file_id)
-    return {"message": "删除成功"}
+    return {"message": "Delete successful"}
 
 
 @data.get("/document")
@@ -158,10 +158,10 @@ async def get_document_info(db_id: str, file_id: str, page: int = 1, page_size: 
     logger.debug(f"GET document {file_id} info in {db_id}")
 
     try:
-        # 基础数据
+        # Basic data
         info = knowledge_base.get_file_info(db_id, file_id)
 
-        # 分页参数校验
+        # Page Break Parameter Verification
         page = max(1, int(page or 1))
         page_size = max(1, min(500, int(page_size or 10)))
 
@@ -199,41 +199,41 @@ async def upload_file(
     if not file.filename:
         raise HTTPException(status_code=400, detail="No selected file")
 
-    # 文件类型白名单验证
+    # Document type white list authentication
     ALLOWED_EXTENSIONS = {'.txt', '.pdf', '.docx', '.doc', '.md', '.csv', '.json', '.xml', '.html', '.htm'}
     MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 
     basename, ext = os.path.splitext(file.filename)
     ext = ext.lower()
 
-    # 验证文件扩展名
+    # Verify File Extension
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"不支持的文件类型: {ext}。支持的类型: {', '.join(ALLOWED_EXTENSIONS)}"
+            detail=f"Unsupported file type: {ext}。Type of support: {', '.join(ALLOWED_EXTENSIONS)}"
         )
 
-    # 验证文件大小（通过读取内容前几个字节检测）
+    # Verify file size (by reading previous bytes of content)
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
         raise HTTPException(
             status_code=400,
-            detail=f"文件大小超过限制: {MAX_FILE_SIZE // (1024*1024)}MB"
+            detail=f"File size exceeding limit: {MAX_FILE_SIZE // (1024*1024)}MB"
         )
 
-    # 验证文件内容（检测恶意文件头）
+    # Validation of document contents (detection of malicious document headers)
     malicious_headers = [b'<script', b'<?php', b'<!DOCTYPE html', b'\x00\x00']
     for header in malicious_headers:
         if content[:len(header)] == header:
             raise HTTPException(
                 status_code=400,
-                detail="检测到恶意文件内容"
+                detail="Malicious document detected"
             )
 
-    # 重置文件指针
+    # Reset File Pointer
     await file.seek(0)
 
-    # 根据db_id获取上传路径，如果db_id为None则使用默认路径
+    # Get upload path according to db id, use default path if db id is None
     if db_id:
         upload_dir = knowledge_base.get_db_upload_path(db_id)
     else:
@@ -248,7 +248,7 @@ async def upload_file(
     with open(file_path, "wb") as buffer:
         buffer.write(await file.read())
 
-    # 返回文件路径，但使用相对路径而不是绝对路径，提高安全性
+    # Return file path, but use relative instead of absolute path to increase security
     relative_path = os.path.relpath(
         file_path, config.save_dir) if config.save_dir in file_path else filename
     return {"message": "File successfully uploaded", "file_path": relative_path, "db_id": db_id}
@@ -256,64 +256,64 @@ async def upload_file(
 
 @data.get("/files")
 async def get_files_list(db_id: str):
-    """获取指定数据库中的所有文件列表"""
+    """Get a list of all files in the specified database"""
     logger.debug(f"GET files list in database {db_id}")
 
     try:
-        # 获取文件列表
+        # Get File List
         files = knowledge_base.get_files_list(db_id)
 
         return {
-            "message": "获取文件列表成功",
+            "message": "Fetching file list successfully",
             "status": "success",
             "db_id": db_id,
             "files": files,
             "total_count": len(files)
         }
     except Exception as e:
-        logger.error(f"获取文件列表失败: {e}, {traceback.format_exc()}")
-        return {"message": "获取文件列表失败，请稍后重试", "status": "failed", "files": []}
+        logger.error(f"Failed to fetch file list: {e}, {traceback.format_exc()}")
+        return {"message": "Failed to fetch file list，Please try again later.", "status": "failed", "files": []}
 
 
 @data.delete("/file")
 async def delete_file_by_id(db_id: str = Body(...), file_id: str = Body(...)):
-    """删除指定数据库中的指定文件"""
+    """Remove the specified file from the specified database"""
     logger.debug(f"DELETE file {file_id} from database {db_id}")
 
     try:
-        # 先检查数据库是否存在
+        # Check the database first.
         db = knowledge_base.get_kb_by_id(db_id)
         if db is None:
-            return {"message": f"数据库不存在，db_id: {db_id}", "status": "failed"}
+            return {"message": f"Database does not exist，db_id: {db_id}", "status": "failed"}
 
-        # 根据file_id获取文件信息
+        # Get file information from file id
         file_info = knowledge_base.get_file_by_id(file_id)
         if file_info is None:
-            return {"message": f"文件不存在，file_id: {file_id}", "status": "failed"}
+            return {"message": f"File does not exist，file_id: {file_id}", "status": "failed"}
 
-        # 验证文件是否属于指定的数据库
+        # Verify whether the file belongs to the specified data Library
         file_db_id = file_info.get("database_id")
         if file_db_id != db_id:
             return {
-                "message": f"文件不属于指定数据库。文件属于数据库: {file_db_id}，请求的数据库: {db_id}",
+                "message": f"File does not belong to the specified database。File belongs to database: {file_db_id}，Database requested: {db_id}",
                 "status": "failed"
             }
 
-        # 执行删除操作
+        # Execute Delete Operation
         knowledge_base.delete_file(db_id, file_id)
 
         return {
-            "message": "文件删除成功",
+            "message": "File deleted successfully",
             "status": "success",
             "file_id": file_id,
             "db_id": db_id,
-            "filename": file_info.get("filename", "未知")
+            "filename": file_info.get("filename", "Unknown")
         }
     except Exception as e:
-        logger.error(f"删除文件失败: {e}, {traceback.format_exc()}")
-        return {"message": "删除文件失败，请稍后重试", "status": "failed"}
+        logger.error(f"Failed to delete file: {e}, {traceback.format_exc()}")
+        return {"message": "Failed to delete file，Please try again later.", "status": "failed"}
 
-# 根据用户ID查询知识库
+# Search the knowledge base by user ID
 
 
 @data.get("/user-knowledge-bases")
@@ -322,18 +322,18 @@ async def get_user_knowledge_bases(user_id: str):
         knowledge_bases = knowledge_base.get_user_knowledge_bases(user_id)
         return knowledge_bases
     except Exception as e:
-        logger.error(f"获取用户知识库失败: {e}, {traceback.format_exc()}")
-        return {"message": "获取用户知识库失败，请稍后重试", "status": "failed"}
+        logger.error(f"Failed to acquire user knowledge base: {e}, {traceback.format_exc()}")
+        return {"message": "Failed to acquire user knowledge base，Please try again later.", "status": "failed"}
 
-# 根据用户ID删除知识库
+# Delete the knowledge base from user ID
 
 
 @data.delete("/user-knowledge-bases")
 async def delete_user_knowledge_bases(user_id: str, db_id: str):
-    """根据用户ID和数据库ID删除单个知识库"""
+    """By UserIDand databaseIDRemove a single knowledge base"""
     try:
         result = knowledge_base.delete_user_database(user_id, db_id)
         return result
     except Exception as e:
-        logger.error(f"删除用户知识库失败: {e}, {traceback.format_exc()}")
-        return {"message": "删除用户知识库失败，请稍后重试", "status": "failed"}
+        logger.error(f"Failed to remove user knowledge base: {e}, {traceback.format_exc()}")
+        return {"message": "Failed to remove user knowledge base，Please try again later.", "status": "failed"}

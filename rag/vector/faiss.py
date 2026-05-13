@@ -3,7 +3,7 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
 from langchain_core.prompts import ChatPromptTemplate
 
-# 如果用本地embedding模型（推荐）：
+# Local embedding model recommended
 from langchain_community.embeddings import HuggingFaceEmbeddings
 import os
 import time
@@ -12,11 +12,12 @@ from typing import List, Tuple, Set
 from rag.vector.vector_database import VectorDatabase
 import json
 from langchain_core.documents import Document
+
 class FaissVectorDatabase(VectorDatabase):
     def __init__(self, path: str = "../data/faiss_index"):
         super().__init__(path)
         
-        # 设置路径
+        # Setup paths
         base_dir = os.path.dirname(os.path.abspath(__file__))
         self.data_dir = os.path.abspath(os.path.join(base_dir, "../data"))
         self.file_uploads_dir = os.path.join(self.data_dir, "file_uploads")
@@ -24,93 +25,95 @@ class FaissVectorDatabase(VectorDatabase):
         self.index_path = os.path.join(self.data_dir, "faiss_index")
         self.exist_file_path = os.path.join(self.data_dir, "file_exist.json")
         
-        # 确保目录存在
+        # Ensure directories exist
         os.makedirs(self.file_uploads_dir, exist_ok=True)
         os.makedirs(self.file_chunks_dir, exist_ok=True)
         os.makedirs(self.index_path, exist_ok=True)
         
-        # 设置模型
+        # Initialize model
         model_path = os.path.abspath(os.path.join(base_dir, "../../models/embedding_model/bge-m3"))
-        print(f"尝试加载嵌入模型：{model_path}")
+        print(f"Attempting to load embedding model: {model_path}")
         
-        # 测试嵌入模型
+        # Test embedding model
         try:
             self.embeddings = HuggingFaceEmbeddings(
                 model_name=model_path
             )
             
-            # 测试嵌入生成
-            test_text = "这是一个测试文本，用于验证嵌入模型是否工作正常。"
+            # Test embedding generation
+            test_text = "This is a test text to verify if the embedding model is working properly."
             test_embedding = self.embeddings.embed_query(test_text)
-            print(f"嵌入模型测试成功，生成了长度为 {len(test_embedding)} 的向量。")
+            print(f"Embedding model loaded successfully. Generated vector length: {len(test_embedding)}")
         except Exception as e:
-            print(f"嵌入模型加载失败: {str(e)}")
-            print("尝试使用在线模型...")
+            print(f"Failed to load local embedding model: {str(e)}")
+            print("Attempting to use online model...")
             try:
                 self.embeddings = HuggingFaceEmbeddings(
                     model_name="BAAI/bge-m3"
                 )
                 test_embedding = self.embeddings.embed_query(test_text)
-                print(f"在线嵌入模型测试成功。")
+                print(f"Online embedding model verified successfully.")
             except Exception as e:
-                print(f"在线嵌入模型也失败: {str(e)}")
-                raise ValueError("无法初始化嵌入模型，请检查网络连接和模型安装。")
+                print(f"Online embedding model also failed: {str(e)}")
+                raise ValueError("Unable to initialize embedding model. Please check network connectivity and model installation.")
         
-        # 创建或加载向量存储
+        # Create or load vector store
         self.vector_store = self.load_or_create_vector_store(self.index_path)
         
-        # 启动自动更新线程
+        # Start background auto-update thread
         self.stop_update_thread = False
         self.update_thread = threading.Thread(target=self._auto_update_vector_store)
         self.update_thread.daemon = True
         self.update_thread.start()
-        print("已启动自动更新线程，每分钟检查一次新文档")
-    def query_vector_database(self, query: str)->List[Document]:
-        """查询向量数据库
-           使用相似度搜索获取文档列表
-           默认的嵌入模型是bge-m3
-        参数:
-            query: 查询文本
-        返回:
-            docs: 文档列表
+        print("Auto-update thread started. Checking for new documents every minute.")
+
+    def query_vector_database(self, query: str) -> List[Document]:
+        """Query vector database.
+           Uses similarity search to retrieve document snippets.
+           Default embedding model: bge-m3
+        Args:
+            query: Query text string
+        Returns:
+            docs: List of Document objects
         """
         return self.vector_store.similarity_search(query)
-    # 自动更新向量库的线程函数
+
+    # Background update thread function
     def _auto_update_vector_store(self):
-        """每分钟自动检查并更新向量数据库"""
+        """Automatically checks and updates the vector database every minute."""
         while not self.stop_update_thread:
             try:
-                print("自动检查新文档...")
+                print("Checking for new documents...")
                 new_files, deleted_files = self.check_file_changes()
                 if new_files or deleted_files:
-                    print(f"检测到文件变化，新增: {len(new_files)}个，删除: {len(deleted_files)}个")
+                    print(f"File changes detected. New: {len(new_files)}, Deleted: {len(deleted_files)}")
                     if new_files:
                         self.process_and_update_documents(new_files)
-                    # TODO: 处理已删除文件的向量数据
-                # 等待60s
+                    # TODO: Handle vector data for deleted files
+                # Wait 60s
                 time.sleep(60)
             except Exception as e:
-                print(f"自动更新过程中出错: {str(e)}")
-                # 出错后等待10秒再重试
+                print(f"Error during auto-update: {str(e)}")
+                # Retry after 10 seconds on error
                 time.sleep(10)
     
-    # 停止更新线程的方法
+    # Stop update thread method
     def stop_auto_update(self):
-        """停止自动更新线程"""
+        """Stop the background auto-update thread."""
         self.stop_update_thread = True
         if self.update_thread.is_alive():
             self.update_thread.join(timeout=2)
-            print("自动更新线程已停止")
+            print("Auto-update thread stopped.")
 
-    # 1. 扫描本地文档
+    # 1. Scan local documents
     def load_documents(self):
-        """扫描本地文档
+        """Scans the local upload directory.
         
-        返回：文件名字符串数组
+        Returns: Array of filenames
         """
-        # 检查目录是否存在并包含文件
+        # Verify directory exists and is not empty
         if not os.path.exists(self.file_uploads_dir) or not os.listdir(self.file_uploads_dir):
-            print(f"目录 {self.file_uploads_dir} 不存在或为空")
+            print(f"Directory {self.file_uploads_dir} does not exist or is empty.")
             return []
         
         file_list = []
@@ -119,103 +122,103 @@ class FaissVectorDatabase(VectorDatabase):
             if os.path.isfile(file_path):
                 file_list.append(file)
         
-        print(f"加载了 {len(file_list)} 个文档")
+        print(f"Loaded {len(file_list)} documents.")
         return file_list
 
-    # 辅助函数：检查FAISS索引是否存在
+    # Helper function: check FAISS index existence
     def faiss_index_exists(self, index_path: str = "../data/faiss_index") -> bool:
-        """检查本地是否存在FAISS索引文件"""
+        """Check if FAISS index files exist locally."""
         required_files = ["index.faiss", "index.pkl"]
         return all(os.path.exists(os.path.join(index_path, f)) for f in required_files)
     
-    # 检查文件变化
+    # Check for file changes
     def check_file_changes(self) -> Tuple[List[str], List[str]]:
-        """检查文件变化，返回新文件和已删除文件列表"""
-        # 获取当前文件列表
+        """Check for file changes and return lists of new and deleted files."""
+        # Get current file list
         current_files = set(self.load_documents())
         
-        # 读取已存在文件列表
+        # Read existing file list registry
         exist_files = set()
         if os.path.exists(self.exist_file_path):
             try:
                 with open(self.exist_file_path, 'r', encoding='utf-8') as f:
                     exist_files = set(json.load(f))
             except Exception as e:
-                print(f"读取已存在文件列表出错: {str(e)}")
+                print(f"Error reading existing file list: {str(e)}")
         
-        # 计算新文件和已删除文件
+        # Calculate diff
         new_files = list(current_files - exist_files)
         deleted_files = list(exist_files - current_files)
         
-        # 更新已存在文件列表
+        # Update registry
         if new_files or deleted_files:
             updated_exist_files = list(current_files)
             with open(self.exist_file_path, 'w', encoding='utf-8') as f:
                 json.dump(updated_exist_files, f, ensure_ascii=False)
-            print(f"已更新文件列表: 总计{len(updated_exist_files)}个文件")
+            print(f"Updated file registry: Total {len(updated_exist_files)} files.")
         
         return new_files, deleted_files
     
-    # 处理文档
+    # Process documents
     def process_documents(self, file_list: List[str], data_path: str) -> Tuple[List, List]:
-        """加载文件夹中的文档，进行文本分割，并保存分割后的文本
+        """Loads documents from folder, splits text, and returns processed metadata.
         
-        param:
-            file_list: 文件列表
-            data_path: 文件夹路径
-        return:
-            processed_files: 处理成功的文件列表
-            split_docs: 分割后的文本列表
+        Args:
+            file_list: List of files to process
+            data_path: Directory path containing files
+        Returns:
+            processed_files: List of successfully processed filenames
+            split_docs: List of Document chunks
         """
         
         documents = []
         processed_files = []
-        # 遍历data_path中的文件，检查是否在file_list列表中
+        # Traverse data_path and process files matching file_list
         supported_extensions = [".pdf", ".json", ".txt", ".docx"]
         for root, _, files in os.walk(data_path):
             for file in files:
                 file_ext = os.path.splitext(file)[1].lower()
                 
-                # 检查文件是否在列表中且扩展名受支持
+                # Verify file is in the target list and has a supported extension
                 if file in file_list and file_ext in supported_extensions:
                     try:
                         file_path = os.path.join(root, file)
-                        # 根据文件类型选择合适的加载器
+                        # Select appropriate loader based on file extension
                         if file_ext == ".pdf":
                             loader = PyPDFLoader(file_path)
                         elif file_ext == ".json":
-                            loader = JSONLoader(file_path,encoding="utf-8")
+                            loader = JSONLoader(file_path, encoding="utf-8")
                         elif file_ext == ".txt":
-                            loader = TextLoader(file_path,encoding="utf-8")
+                            loader = TextLoader(file_path, encoding="utf-8")
                         elif file_ext == ".docx":
                             loader = Docx2txtLoader(file_path)
                             
-                        # 加载文档
+                        # Load document
                         doc = loader.load()
                         documents.extend(doc)
                         processed_files.append(file)
-                        print(f"已加载文件: {file}")
+                        print(f"Loaded file: {file}")
                     except Exception as e:
-                        print(f"加载文件 {file} 时出错: {str(e)}")
+                        print(f"Error loading file {file}: {str(e)}")
         
         if not documents:
-            print(f"未找到有效文档")
+            print("No valid documents found.")
             return processed_files, []
 
-        # 分割文本
+        # Split text into chunks
         text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=3000,           # 每个文本块的最大字符数
-            chunk_overlap=1000,          # 相邻文本块之间重叠的字符数
-            length_function=len,       # 用于计算文本长度的函数，这里用的是内置的len函数
-            is_separator_regex=False,  # 分隔符是否为正则表达式，False表示不是
+            chunk_size=3000,           # Max characters per chunk
+            chunk_overlap=1000,        # Overlap between adjacent chunks
+            length_function=len,       # Function to calculate text length
+            is_separator_regex=False,  # If True, treat separator as regex
         )
         split_docs = text_splitter.split_documents(documents)
         
         return processed_files, split_docs
     
-    #保存分块
+    # Save split chunks
     def save_split_docs(self, split_docs: List, chunk_path: str):
-        """保存分割后的文本"""
+        """Saves document chunks to local text files."""
         os.makedirs(chunk_path, exist_ok=True)
         for i, doc in enumerate(split_docs):
             base_filename = os.path.splitext(os.path.basename(doc.metadata["source"]))[0]
@@ -223,70 +226,70 @@ class FaissVectorDatabase(VectorDatabase):
             with open(chunk_filename, "w", encoding="utf-8") as f:
                 f.write(doc.page_content)
             
-        print(f"已保存 {len(split_docs)} 个文本块")
+        print(f"Saved {len(split_docs)} document chunks.")
     
-    # 处理并更新文档的统一函数
+    # Unified process and update function
     def process_and_update_documents(self, file_list: List[str]):
-        """处理新文档，保存分块，并更新向量数据库"""
+        """Processes new documents, saves chunks, and updates the vector database."""
         
-        # 处理文档
+        # Process docs
         processed_files, new_split_docs = self.process_documents(file_list, self.file_uploads_dir)
-        print(f"处理的文件: {processed_files}")
+        print(f"Processed files: {processed_files}")
         
-        # 保存分块
+        # Save chunks and update store
         if new_split_docs:
             self.save_split_docs(new_split_docs, self.file_chunks_dir)
             
-            # 更新向量数据库
-            print(f"正在添加 {len(new_split_docs)} 个新文档块到向量数据库...")
+            # Update vector database
+            print(f"Adding {len(new_split_docs)} new document chunks to vector database...")
             self.vector_store.add_documents(new_split_docs)
             self.vector_store.save_local(self.index_path)
-            print("数据库更新完成！")
+            print("Vector database update complete!")
         else:
-            print("未处理到有效文档，无需更新")
+            print("No valid documents processed; no update required.")
         
         return new_split_docs
 
-    # 修改后的向量数据库创建/加载函数
+    # Create or load vector store
     def load_or_create_vector_store(self, index_path: str = "../data/faiss_index"):
-        """智能创建或加载向量数据库"""
+        """Intelligently creates or loads the vector database."""
 
         if self.faiss_index_exists(index_path):
-            print("检测到已有向量数据库，正在加载...")
+            print("Existing vector database detected. Loading...")
             return FAISS.load_local(
                 folder_path=index_path,
                 embeddings=self.embeddings,
                 allow_dangerous_deserialization=True
             )
         else:
-            print("创建新向量数据库...")
-            # 加载文档
+            print("Creating new vector database...")
+            # Load initial documents
             file_list = self.load_documents()
             
-            # 检查文档是否为空
+            # Check for empty file list
             if not file_list:
-                print("警告：没有找到任何文档！请确保目录中有PDF、TXT、JSON或DOCX文件。")
-                # 创建空的向量存储
+                print("Warning: No documents found! Ensure the directory contains PDF, TXT, JSON, or DOCX files.")
+                # Create an empty initial vector store
                 vector_store = FAISS.from_documents(
-                    documents=[Document(page_content="初始化", metadata={"source": "faiss数据库初始化"})],
+                    documents=[Document(page_content="Initialization", metadata={"source": "faiss_initialization"})],
                     embedding=self.embeddings
                 )
                 vector_store.save_local(index_path)
                 return vector_store
                             
-            # 分割文本
+            # Process documents
             processed_files, split_docs = self.process_documents(file_list, self.file_uploads_dir)
             
-            # 保存分块
+            # Save chunks
             self.save_split_docs(split_docs, self.file_chunks_dir)
             
-            # 更新已存在文件列表
+            # Update file registry
             with open(self.exist_file_path, 'w', encoding='utf-8') as f:
                 json.dump(processed_files, f, ensure_ascii=False)
-            print(f"已初始化文件列表，包含 {len(processed_files)} 个文件")
+            print(f"Initialized file registry with {len(processed_files)} files.")
 
-            print(f"创建向量数据库，包含 {len(split_docs)} 个文档块...")           
-            # 创建向量数据库
+            print(f"Creating vector database with {len(split_docs)} chunks...")           
+            # Create vector store from documents
             vector_store = FAISS.from_documents(
                 documents=split_docs,
                 embedding=self.embeddings
@@ -294,7 +297,7 @@ class FaissVectorDatabase(VectorDatabase):
             vector_store.save_local(index_path)
             return vector_store
 
-    # 更新向量数据库
+    # Update vector database
     def update_vector_store(self, file_list: List[str]):
-        """动态更新现有向量数据库"""
+        """Dynamically update existing vector database."""
         return self.process_and_update_documents(file_list)

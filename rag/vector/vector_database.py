@@ -1,7 +1,7 @@
 from typing import List
 from pydantic import BaseModel
 from langchain_core.documents import Document
-# 将VectorDatabase类定义放在最前面，避免循环导入
+# Define VectorDatabase class first to avoid circular imports
 class VectorDatabase:
     def __init__(self, path = None):
         self.vector_database = {}
@@ -18,7 +18,7 @@ class VectorDatabase:
         """update vector database"""
         pass
 
-# 延迟导入FaissVectorDatabase，避免循环依赖
+# Lazy import FaissVectorDatabase to avoid circular dependencies
 vector_database_instance = None
 
 def create_vector_database_instance(path = None):

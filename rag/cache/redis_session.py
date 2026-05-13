@@ -6,14 +6,14 @@ import uuid
 from datetime import datetime, timedelta
 
 class RedisSessionManager:
-    """Redis会话管理器，用于异步缓存会话信息"""
+    """Redis session manager for asynchronously caching session information."""
 
     def __init__(self, redis_url: str = "redis://localhost:6379", expire_time: int = 3600):
-        """初始化Redis会话管理器
+        """Initialize Redis session manager.
 
         Args:
-            redis_url: Redis连接URL
-            expire_time: 会话过期时间(秒)
+            redis_url: Redis connection URL.
+            expire_time: Session expiration time in seconds.
         """
         self.redis_url = redis_url
         self.expire_time = expire_time
@@ -21,7 +21,7 @@ class RedisSessionManager:
         self._connection_lock = asyncio.Lock()
 
     async def _get_redis(self):
-        """获取Redis连接"""
+        """Get Redis connection."""
         if self.redis is None:
             async with self._connection_lock:
                 if self.redis is None:
@@ -29,31 +29,31 @@ class RedisSessionManager:
         return self.redis
 
     async def get_session(self, session_id: str) -> Optional[Dict]:
-        """获取会话信息
+        """Retrieve session information.
 
         Args:
-            session_id: 会话ID
+            session_id: The session ID.
 
         Returns:
-            会话信息字典或None
+            Session information dictionary or None if not found.
         """
         redis = await self._get_redis()
         data = await redis.get(f"session:{session_id}")
         if data:
-            # 更新过期时间
+            # Refresh expiration time
             await redis.expire(f"session:{session_id}", self.expire_time)
             return json.loads(data)
         return None
 
     async def set_session(self, session_id: str, data: Dict) -> bool:
-        """设置会话信息
+        """Set session information.
 
         Args:
-            session_id: 会话ID
-            data: 会话数据
+            session_id: The session ID.
+            data: Session data to store.
 
         Returns:
-            是否成功
+            bool: True if successful.
         """
         redis = await self._get_redis()
         await redis.set(
@@ -64,13 +64,13 @@ class RedisSessionManager:
         return True
 
     async def get_history(self, session_id: str) -> List[Dict]:
-        """获取会话历史记录
+        """Retrieve session history.
 
         Args:
-            session_id: 会话ID
+            session_id: The session ID.
 
         Returns:
-            会话历史记录列表
+            List of session history records.
         """
         session = await self.get_session(session_id)
         if session and "history" in session:
@@ -78,45 +78,45 @@ class RedisSessionManager:
         return []
 
     async def add_message(self, session_id: str, role: str, content: str) -> List[Dict]:
-        """添加消息到会话历史
+        """Add a message to the session history.
 
         Args:
-            session_id: 会话ID
-            role: 角色(user/assistant/system)
-            content: 消息内容
+            session_id: The session ID.
+            role: The role (user/assistant/system).
+            content: The message content.
 
         Returns:
-            更新后的历史记录
+            List: Updated history records.
         """
         session = await self.get_session(session_id) or {"history": []}
 
         if "history" not in session:
             session["history"] = []
 
-        # 添加消息
+        # Add message
         session["history"].append({
             "role": role,
             "content": content,
             "timestamp": datetime.now().isoformat()
         })
 
-        # 更新会话
+        # Update session
         await self.set_session(session_id, session)
         return session["history"]
 
     async def create_session(self, system_prompt: str = None) -> str:
-        """创建新会话
+        """Create a new session.
 
         Args:
-            system_prompt: 系统提示词
+            system_prompt: Optional system prompt.
 
         Returns:
-            新会话ID
+            str: The new session ID.
         """
         session_id = str(uuid.uuid4())
         session = {"history": []}
 
-        # 如果有系统提示词，添加到历史记录
+        # If a system prompt is provided, add it to the history
         if system_prompt:
             session["history"].append({
                 "role": "system",
@@ -128,19 +128,19 @@ class RedisSessionManager:
         return session_id
 
     async def delete_session(self, session_id: str) -> bool:
-        """删除会话
+        """Delete a session.
 
         Args:
-            session_id: 会话ID
+            session_id: The session ID.
 
         Returns:
-            是否成功
+            bool: True if successful.
         """
         redis = await self._get_redis()
         result = await redis.delete(f"session:{session_id}")
         return result > 0
 
     async def close(self):
-        """关闭Redis连接"""
+        """Close Redis connection."""
         if self.redis:
-            await self.redis.close()
+            await self.redis.close()

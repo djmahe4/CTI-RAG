@@ -1,4 +1,4 @@
-# ThreatRAG 测试
-## 说明
+# Threatrag Test
+# Description
 
-测试代码统一放在这个文件夹下
+The test code is placed under this folder

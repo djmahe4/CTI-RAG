@@ -4,79 +4,79 @@ import sys
 import os
 import json
 
-# 添加项目根目录到路径
+# Add root directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rag.cache.redis_session import RedisSessionManager
 
-# 使用测试Redis URL
-TEST_REDIS_URL = "redis://localhost:6379/1"  # 使用DB 1进行测试，避免影响生产数据
+# Use test Redis URL
+TEST_REDIS_URL = "redis://localhost:6379/1"  # Testing using DB 1 to avoid affecting production data
 
 @pytest.fixture
 async def redis_session():
-    """创建Redis会话管理器实例"""
+    """CreateRedisSession Manager Example"""
     session_manager = RedisSessionManager(redis_url=TEST_REDIS_URL, expire_time=60)
     yield session_manager
-    # 清理测试数据
+    # Clear Test Data
     redis = await session_manager._get_redis()
     await redis.flushdb()
     await session_manager.close()
 
 @pytest.mark.asyncio
 async def test_create_session(redis_session):
-    """测试创建会话"""
-    # 创建会话
-    session_id = await redis_session.create_session(system_prompt="测试系统提示词")
+    """Test Create Session"""
+    # Create Session
+    session_id = await redis_session.create_session(system_prompt="Test system hints")
     
-    # 验证会话ID格式
+    # Authentication Session ID format
     assert isinstance(session_id, str)
     assert len(session_id) > 0
     
-    # 获取会话并验证
+    # Fetch Session and Verify
     session = await redis_session.get_session(session_id)
     assert session is not None
     assert "history" in session
     assert len(session["history"]) == 1
     assert session["history"][0]["role"] == "system"
-    assert session["history"][0]["content"] == "测试系统提示词"
+    assert session["history"][0]["content"] == "Test system hints"
 
 @pytest.mark.asyncio
 async def test_add_message(redis_session):
-    """测试添加消息"""
-    # 创建会话
+    """Test Add Message"""
+    # Create Session
     session_id = await redis_session.create_session()
     
-    # 添加用户消息
-    await redis_session.add_message(session_id, "user", "你好")
+    # Add User Message
+    await redis_session.add_message(session_id, "user", "Hello.")
     
-    # 添加助手消息
-    await redis_session.add_message(session_id, "assistant", "你好，有什么可以帮助你的？")
+    # Add Assistant Message
+    await redis_session.add_message(session_id, "assistant", "Hello. What can I do for you?")
     
-    # 获取会话历史
+    # Get Session History
     history = await redis_session.get_history(session_id)
     
-    # 验证历史记录
+    # Verify history
     assert len(history) == 2
     assert history[0]["role"] == "user"
-    assert history[0]["content"] == "你好"
+    assert history[0]["content"] == "Hello."
     assert history[1]["role"] == "assistant"
-    assert history[1]["content"] == "你好，有什么可以帮助你的？"
+    assert history[1]["content"] == "Hello. What can I do for you?"
 
 @pytest.mark.asyncio
 async def test_delete_session(redis_session):
-    """测试删除会话"""
-    # 创建会话
+    """Test Remove Session"""
+    # Create Session
     session_id = await redis_session.create_session()
     
-    # 验证会话存在
+    # Authentication session exists
     session = await redis_session.get_session(session_id)
     assert session is not None
     
-    # 删除会话
+    # Remove Session
     result = await redis_session.delete_session(session_id)
     assert result is True
     
-    # 验证会话已删除
+    # Authentication session deleted
     session = await redis_session.get_session(session_id)
     assert session is None
 

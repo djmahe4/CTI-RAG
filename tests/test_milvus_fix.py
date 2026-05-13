@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-测试Milvus集合加载修复的脚本
+TestMilvusFix to load repaired scripts
 """
 
 import sys
@@ -13,67 +13,67 @@ from packages.core.knowledgebase import KnowledgeBase
 from packages.utils.logging_config import logger
 
 def test_milvus_fix():
-    """测试Milvus修复"""
-    print("开始测试Milvus集合加载修复...")
+    """Test Milvus Rehabilitation"""
+    print("Starting Milvus pool load repair test...")
     
     try:
-        # 1. 启动Milvus服务器
-        print("1. 启动Milvus服务器...")
+        # 1. Launch of the Milvus server
+        print("1. Starting Milvus Server...")
         milvus_manager = get_milvus_manager()
         if not milvus_manager.start():
-            print("❌ Milvus服务器启动失败")
+            print("❌ Milvus Server startup failed")
             return False
-        print("✅ Milvus服务器启动成功")
+        print("✅ Milvus Server started successfully")
         
-        # 2. 创建知识库实例
-        print("2. 创建知识库实例...")
+        # 2. Knowledge base instance creation
+        print("2. Creating KnowledgeBase instance...")
         kb = KnowledgeBase()
-        print("✅ 知识库实例创建成功")
+        print("✅ KnowledgeBase instance created successfully")
         
-        # 3. 检查现有集合
-        print("3. 检查现有集合...")
+        # 3. Check existing collections
+        print("3. Checking existing collections...")
         collections = kb.get_collection_names()
-        print(f"发现 {len(collections)} 个集合: {collections}")
+        print(f"Found {len(collections)} collections: {collections}")
         
-        # 4. 测试集合加载
+        # 4. Test collection loading
         if collections:
             test_collection = collections[0]
-            print(f"4. 测试集合 {test_collection} 的加载...")
+            print(f"4. Testing collection '{test_collection}' loading...")
             
-            # 确保集合已加载
+            # Ensure collection loaded
             if kb.ensure_collection_loaded(test_collection):
-                print(f"✅ 集合 {test_collection} 加载成功")
+                print(f"✅ Collection '{test_collection}' loaded successfully")
                 
-                # 5. 测试搜索功能
-                print("5. 测试搜索功能...")
+                # 5. Test search function
+                print("5. Testing search function...")
                 try:
-                    # 尝试进行一个简单的搜索
+                    # Try a simple search
                     results = kb.search("test query", test_collection, limit=1)
-                    print(f"✅ 搜索成功，返回 {len(results)} 个结果")
+                    print(f"✅ Search successful, returned {len(results)} results")
                 except Exception as e:
-                    print(f"⚠️ 搜索测试失败（可能是因为集合为空）: {e}")
+                    print(f"⚠️ Search test failed (may be due to empty collection): {e}")
             else:
-                print(f"❌ 集合 {test_collection} 加载失败")
+                print(f"❌ Collection '{test_collection}' loading failed")
         else:
-            print("4. 没有找到现有集合，跳过测试")
+            print("4. No existing collections found, skipping load test")
         
-        print("✅ 测试完成")
+        print("✅ Test complete.")
         return True
         
     except Exception as e:
-        print(f"❌ 测试过程中出错: {e}")
+        print(f"❌ Error during testing: {e}")
         import traceback
         traceback.print_exc()
         return False
     
     finally:
-        # 清理
+        # Cleanup
         try:
-            print("清理资源...")
+            print("Cleaning up resources...")
             if 'milvus_manager' in locals():
                 milvus_manager.stop()
         except Exception as e:
-            print(f"清理过程中出错: {e}")
+            print(f"Error during cleanup: {e}")
 
 if __name__ == "__main__":
     success = test_milvus_fix()

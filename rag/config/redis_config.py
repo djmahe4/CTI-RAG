@@ -1,10 +1,10 @@
 import os
 from dotenv import load_dotenv
 
-# 加载环境变量
+# Load environment variables
 load_dotenv()
 
-# Redis配置
+# Redis configuration
 REDIS_CONFIG = {
     "url": os.getenv("REDIS_URL", "redis:6379"),
     "db": int(os.getenv("REDIS_DB", "0")),
@@ -15,13 +15,13 @@ REDIS_CONFIG = {
     "max_connections": int(os.getenv("REDIS_MAX_CONNECTIONS", "10")),
 }
 
-# 会话配置
+# Session configuration
 SESSION_CONFIG = {
-    "expire_time": int(os.getenv("SESSION_EXPIRE_TIME", "3600")),  # 会话过期时间(秒)
-    "max_history_length": int(os.getenv("MAX_HISTORY_LENGTH", "50")),  # 最大历史记录长度
+    "expire_time": int(os.getenv("SESSION_EXPIRE_TIME", "3600")),  # Session expiration time (seconds)
+    "max_history_length": int(os.getenv("MAX_HISTORY_LENGTH", "50")),  # Maximum history length
 }
 
-# 协程池配置
+# Coroutine pool configuration
 COROUTINE_POOL_CONFIG = {
-    "max_workers": int(os.getenv("MAX_CONCURRENT_CHATS", "20")),  # 最大并发聊天数
-}
+    "max_workers": int(os.getenv("MAX_CONCURRENT_CHATS", "20")),  # Maximum concurrent chat workers
+}

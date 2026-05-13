@@ -1,42 +1,45 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-独立启动Milvus服务器的脚本
+Independent Start Milvus Script for Server
 """
 
 import sys
 import os
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from ..packages.manager.milvus_manager import get_milvus_manager
-from ..packages.utils.logging_config import logger
+# Fix path to allow relative imports if run as a script
+if __name__ == "__main__":
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from packages.manager.milvus_manager import get_milvus_manager
+from packages.utils.logging_config import logger
 
 def start_milvus_only():
-    """只启动Milvus服务器"""
-    print("启动Milvus服务器...")
+    """Start only Milvus Server"""
+    print("Starting Milvus Server...")
     
     try:
         milvus_manager = get_milvus_manager()
         if milvus_manager.start():
-            print("✅ Milvus服务器启动成功")
+            print("✅ Milvus Server started successfully")
             
-            # 保持运行
-            print("Milvus服务器正在运行，按Ctrl+C停止...")
+            # Keep running
+            print("Milvus Server is running. Press Ctrl+C to stop...")
             try:
                 import time
                 while True:
                     time.sleep(1)
             except KeyboardInterrupt:
-                print("\n正在停止Milvus服务器...")
+                print("\nStopping Milvus Server...")
                 milvus_manager.stop()
-                print("✅ Milvus服务器已停止")
+                print("✅ Milvus Server stopped")
                 return True
         else:
-            print("❌ Milvus服务器启动失败")
+            print("❌ Milvus Server startup failed")
             return False
             
     except Exception as e:
-        print(f"❌ 启动过程中出错: {e}")
+        print(f"❌ Error during startup: {e}")
         import traceback
         traceback.print_exc()
         return False
